@@ -27,3 +27,6 @@ pywin32-ctypes==0.2.3 \
 # von pyinstaller
 setuptools==84.2.1 \
     --hash=sha256:ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2
+# von pyinstaller (Apache-2.0 / BSD-2-Clause)
+packaging==26.3 \
+    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
