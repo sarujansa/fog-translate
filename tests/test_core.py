@@ -390,3 +390,46 @@ def test_a_region_marked_before_0_7_1_is_dropped_so_it_gets_marked_again(tmp_pat
     s["region"] = [0.8, 0.6, 0.15, 0.25]
     s.save()
     assert Settings(str(tmp_path))["region"] == [0.8, 0.6, 0.15, 0.25]
+
+
+# ---------------------------------------------------------------- the lobby moves behind the chat
+def _lobby(lines, t):
+    """Like the DBD lobby: flickering fire light, a softly lit figure moving, and the chat's translucent dark panel
+    (the flicker shows through it) with light text."""
+    from PIL import Image, ImageDraw
+    w, h = 480, 260
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    light = 130 + 60 * np.sin(xx / 40.0 + t) * np.cos(yy / 30.0 - t)                 # fire light
+    figure = 70 * np.exp(-((xx - (60 + 6 * t)) ** 2 / 300 + (yy - 120) ** 2 / 2000))   # soft, moving
+    bg = np.clip(light + figure, 0, 255)
+    pic = np.stack([bg * 0.5, bg * 0.6, bg], axis=-1)
+    pic[20:240, 110:470] *= 0.12                                                       # translucent panel
+    img = Image.fromarray(pic.astype(np.uint8))
+    d = ImageDraw.Draw(img)
+    for i, text in enumerate(lines):
+        d.text((118, 30 + 18 * i), text, fill=(235, 235, 235))
+    return np.asarray(img)[..., ::-1].copy()
+
+
+def test_a_moving_lobby_behind_the_chat_does_not_block_or_repeat_requests():
+    """Saru, 09.11.2026: messages in the chat, nothing recognised – the box reached past the chat panel and the
+    moving lobby never let the picture settle."""
+    g = ChangeGate()
+    chat = ["Meg: hello", "Dwight: privet vsem kak dela", "Ace: gg"]
+    sent = [g.look(_lobby(chat, t)) for t in range(10)]
+    assert sent.count(True) == 1                     # sent once, although the background never stood still
+    chat2 = chat + ["Nea: kto kempit"]
+    sent = [g.look(_lobby(chat2, t)) for t in range(10, 16)]
+    assert sent.count(True) == 1                     # the new line is sent once
+
+
+def test_changing_text_is_sent_even_if_the_box_never_settles():
+    g = ChangeGate(settle=2, max_wait=4)
+    results = [g.look(_lobby(["line %d %s" % (i, "x" * i)], i)) for i in range(1, 9)]
+    assert any(results)                              # waits at most max_wait looks
+    assert results.count(True) <= 3                  # but does not fire on every look
+
+
+def test_an_area_without_text_is_never_sent():
+    g = ChangeGate(settle=1)
+    assert not any(g.look(_lobby([], t)) for t in range(6))

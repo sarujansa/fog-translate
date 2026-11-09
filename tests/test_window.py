@@ -103,3 +103,17 @@ def test_the_history_is_plain_text_even_if_the_service_sends_markup(app):
     html = history_html([ChatLine("<b>Meg</b>", "<img src=x>", "ru", "<a href='x'>hi</a>", True)])
     assert "<b>Meg" not in html and "<img" not in html and "<a href" not in html
     assert "&lt;a href" in html and "RU" in html
+
+
+def test_the_status_says_when_the_marked_area_shows_no_text(app):
+    win = MainWindow(Settings())
+    win.running = True
+    win.engine.status = "watching"
+    win.engine.gate.stats = {"text_px": 3}
+    win._refresh()
+    assert "no text found" in win.status.text()
+    win.engine.gate.stats = {"text_px": 5000}
+    win._refresh()
+    assert win.status.text() == "Watching the chat …"
+    win.running = False
+    win.close()

@@ -469,6 +469,10 @@ class MainWindow(QWidget):
             text = STATUS["no_region"]
         if e.status == "error":
             text = ERRORS.get(e.error, e.error)
+        elif self.running and e.status == "watching":
+            from .change import MIN_TEXT_PX
+            if e.gate.stats.get("text_px", MIN_TEXT_PX) < MIN_TEXT_PX:
+                text = "Watching the chat … no text found in the marked area (mark it again?)"
         self.status.setText(text)
         self.run_btn.setText("Stop" if self.running else "Start")
         now = datetime.now()
