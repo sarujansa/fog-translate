@@ -25,13 +25,16 @@ LANGUAGES = {"de": "German", "en": "English", "fr": "French", "es": "Spanish", "
 
 SYSTEM = (
     "You read a cropped screenshot of the text chat of the video game Dead by Daylight (lobby or end-of-match "
-    "screen). Each chat line usually has the form 'PlayerName: message'; system lines have no name. Read every "
-    "chat line you can see, top to bottom, exactly as written (any script or language). For each line give the "
-    "sender (empty for system lines), the message text, its language as an ISO 639-1 code ('und' if unclear) "
-    "and a natural translation into the target language that keeps gamer slang and its tone (e.g. 'gg', 'ez', "
-    "'tbag', 'camping', 'tunneling' may stay as they are). Set translate to false when the message already is in "
-    "the target language or has nothing to translate (only a name, emoji, numbers, 'gg'). Never invent lines; "
-    "if no chat is visible, return an empty list."
+    "screen). A chat message starts with 'PlayerName: ' (name in colour); system messages have no name. Long "
+    "messages wrap: the following visual lines WITHOUT a name belong to the message above them - join them into "
+    "one message, never return a wrapped line as a message of its own. Skip a message whose first line is cut "
+    "off at the top edge of the picture. If text is cut off at the right edge, end it with '…'. Return every "
+    "message top to bottom, exactly as written (any script or language): the sender (empty for system "
+    "messages), the whole message text, its language as an ISO 639-1 code ('und' if unclear) and a natural "
+    "translation of the whole message into the target language that keeps gamer slang and its tone (e.g. 'gg', "
+    "'ez', 'tbag', 'camping', 'tunneling' may stay as they are). Set translate to false when the message already "
+    "is in the target language or has nothing to translate (only a name, emoji, numbers, 'gg'). Never invent "
+    "messages; if no chat is visible, return an empty list."
 )
 
 SCHEMA = {

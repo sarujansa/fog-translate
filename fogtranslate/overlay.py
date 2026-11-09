@@ -14,6 +14,8 @@ from PySide6.QtWidgets import QWidget
 from .lines import ChatLine
 
 PAD = 10
+ROW_GAP = 2
+MSG_GAP = 8
 MAX_W = 720
 BG = QColor(12, 12, 16, 215)
 SENDER = QColor(150, 160, 175)
@@ -52,23 +54,30 @@ class TranslationOverlay(QWidget):
         self.font_small.setPixelSize(max(9, int(px * 0.75)))
 
     def rows(self, line: ChatLine):
-        head = (line.sender + ": ") if line.sender else ""
-        tag = "[" + line.language.upper() + "] " if line.translate else ""
-        out = [(tag, head, line.translation, self.font_main)]
+        """[(parts, font)] – parts = [(text, colour)]: header (tag + name), translation, original (small)."""
+        tag = [(line.language.upper() + "  ", LANG)] if line.translate else []
+        out = [(tag + [(line.sender or "System", SENDER)], self.font_small)]
+        out.append(([(line.translation if line.translate else line.text, TEXT)], self.font_main))
         if self.show_original and line.translate and line.translation != line.text:
-            out.append(("", "", line.text, self.font_small))
+            out.append(([(line.text, ORIGINAL)], self.font_small))
         return out
 
+    def _height(self, text: str, font, width: int) -> int:
+        fm = QFontMetrics(font)
+        return fm.boundingRect(QRect(0, 0, width, 100000), int(Qt.TextFlag.TextWordWrap), text).height()
+
     def layout_size(self, lines) -> tuple[int, int]:
-        w = h = 0
-        for line in lines:
-            for tag, head, text, font in self.rows(line):
+        inner = MAX_W - 2 * PAD
+        w = 0
+        h = PAD
+        for n, line in enumerate(lines):
+            for parts, font in self.rows(line):
+                text = "".join(t for t, _ in parts)
                 fm = QFontMetrics(font)
-                r = fm.boundingRect(QRect(0, 0, MAX_W - 2 * PAD, 10000), Qt.TextFlag.TextWordWrap,
-                                    tag + head + text)
-                w = max(w, r.width())
-                h += r.height() + 2
-        return min(MAX_W, w + 2 * PAD + 4), h + 2 * PAD
+                w = max(w, min(inner, fm.horizontalAdvance(text) + 2))
+                h += self._height(text, font, inner) + ROW_GAP
+            h += MSG_GAP if n < len(lines) - 1 else 0
+        return w + 2 * PAD, h + PAD - ROW_GAP
 
     def show_lines(self, lines, spot_for_size):
         """``spot_for_size((w, h)) → (x, y)``; hidden when there is nothing to show."""
@@ -91,22 +100,24 @@ class TranslationOverlay(QWidget):
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(BG)
         p.drawRoundedRect(self.rect(), 8, 8)
+        width = self.width() - 2 * PAD
         y = PAD
-        for line in self.lines:
-            for tag, head, text, font in self.rows(line):
+        for n, line in enumerate(self.lines):
+            for parts, font in self.rows(line):
                 p.setFont(font)
-                fm = QFontMetrics(font)
-                x = PAD
-                if tag:
-                    p.setPen(LANG)
-                    p.drawText(x, y + fm.ascent(), tag)
-                    x += fm.horizontalAdvance(tag)
-                if head:
-                    p.setPen(SENDER)
-                    p.drawText(x, y + fm.ascent(), head)
-                    x += fm.horizontalAdvance(head)
-                p.setPen(TEXT if font is self.font_main else ORIGINAL)
-                rest = QRect(x, y, self.width() - PAD - x, 10000)
-                r = p.drawText(rest, int(Qt.TextFlag.TextWordWrap), text)
-                y += max(r.height(), fm.height()) + 2
+                text = "".join(t for t, _ in parts)
+                height = self._height(text, font, width)
+                if len(parts) == 1:
+                    p.setPen(parts[0][1])
+                    p.drawText(QRect(PAD, y, width, height), int(Qt.TextFlag.TextWordWrap), text)
+                else:                                # header: one short line in several colours
+                    fm = QFontMetrics(font)
+                    x = PAD
+                    for part, colour in parts:
+                        p.setPen(colour)
+                        p.drawText(x, y + fm.ascent(), fm.elidedText(part, Qt.TextElideMode.ElideRight,
+                                                                      PAD + width - x))
+                        x += fm.horizontalAdvance(part)
+                y += height + ROW_GAP
+            y += MSG_GAP
         p.end()

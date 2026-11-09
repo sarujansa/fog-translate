@@ -95,3 +95,11 @@ def test_the_update_button_follows_the_check(app):
     win._update_checked(Check("dirty"))
     assert win.update_btn.text() == "Nach Updates suchen" and "geändert" in win.status.text()
     win.close()
+
+
+def test_the_history_is_plain_text_even_if_the_service_sends_markup(app):
+    from fogtranslate.app import history_html
+    from fogtranslate.lines import ChatLine
+    html = history_html([ChatLine("<b>Meg</b>", "<img src=x>", "ru", "<a href='x'>hi</a>", True)])
+    assert "<b>Meg" not in html and "<img" not in html and "<a href" not in html
+    assert "&lt;a href" in html and "RU" in html
