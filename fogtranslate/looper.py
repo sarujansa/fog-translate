@@ -55,7 +55,12 @@ class Looper(threading.Thread):
             if self._grabber_factory is None:
                 from .grab import Grabber
                 self._grabber_factory = Grabber
-            grabber = self._grabber_factory()
+            try:
+                grabber = self._grabber_factory()
+            except Exception as e:
+                log.exception("Bildschirmaufnahme nicht gestartet")
+                self.post(("start_failed", TranslateError("other", type(e).__name__)))
+                return
             while not self.stop_event.is_set():
                 now = time.monotonic()
                 if game is None or now - game_at >= GAME_EVERY_S:

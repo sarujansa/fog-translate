@@ -145,8 +145,13 @@ class MainWindow(QWidget):
 
         self.history = QListWidget()
         root.addWidget(self.history, 1)
+        bottom = QHBoxLayout()
         self.costs = QLabel()
-        root.addWidget(self.costs)
+        bottom.addWidget(self.costs, 1)
+        self.update_btn = QPushButton("Nach Updates suchen", clicked=self.update_clicked)
+        bottom.addWidget(self.update_btn)
+        root.addLayout(bottom)
+        self._update = None          # last update.Check
         self.resize(560, 560)
         self._service_ui()
 
@@ -261,6 +266,63 @@ class MainWindow(QWidget):
         self._picture_view = view
         view.show()
 
+    # ---------------------------------------------------------------- updates (only on click)
+    UPDATE_TEXT = {
+        "current": "Fog Translate ist aktuell.",
+        "dirty": "Update nicht möglich: Dateien im Programmordner wurden geändert.",
+        "branch": "Update nicht möglich: nicht auf dem Zweig „main“.",
+        "ahead": "Update nicht möglich: eigene Commits im Programmordner.",
+        "error": "Update-Prüfung fehlgeschlagen (keine Verbindung zu GitHub?).",
+    }
+
+    def update_clicked(self):
+        from . import update
+        c = self._update
+        if c is not None and c.state == "behind":
+            self._update_apply()
+            return
+        if c is not None and c.state == "newer":
+            from PySide6.QtCore import QUrl
+            from PySide6.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl(update.REPO_URL))
+            return
+        self.update_btn.setEnabled(False)
+        self.update_btn.setText("Suche …")
+        import threading
+        threading.Thread(target=lambda: self.results.put(("update", update.check())), name="update",
+                         daemon=True).start()
+
+    def _update_checked(self, c):
+        self._update = c
+        self.update_btn.setEnabled(True)
+        if c.state == "behind":
+            self.update_btn.setText("Aktualisieren und neu starten")
+            self.status.setText("Update verfügbar (%d Änderung%s)." % (c.behind, "" if c.behind == 1 else "en"))
+        elif c.state == "newer":
+            self.update_btn.setText("Download-Seite öffnen")
+            self.status.setText("Version %s ist verfügbar (installiert: %s)." % (c.remote_version, __version__))
+        else:
+            self.update_btn.setText("Nach Updates suchen")
+            self.status.setText(self.UPDATE_TEXT.get(c.state, c.state))
+        log.info("Update-Prüfung: %s", c.state)
+
+    def _update_apply(self):
+        from . import update
+        if self.running:
+            self.toggle()
+        if not update.apply():
+            self._update = None
+            self.update_btn.setText("Nach Updates suchen")
+            self.status.setText("Update nicht möglich (siehe Log).")
+            log.warning("Update: Fast-Forward nicht möglich")
+            return
+        log.info("Update installiert, Neustart")
+        if update.restart():
+            self.close()
+            QApplication.quit()
+        else:
+            self.status.setText("Update installiert – bitte Fog Translate neu starten.")
+
     # ---------------------------------------------------------------- region
     def pick_region(self):
         game = window.find_game()
@@ -322,7 +384,9 @@ class MainWindow(QWidget):
                 kind, value = self.results.get_nowait()
             except queue.Empty:
                 break
-            if kind == "tick":
+            if kind == "update":
+                self._update_checked(value)
+            elif kind == "tick":
                 self.game = value
             elif kind == "started":
                 if self.engine.status == "starting":
