@@ -11,6 +11,8 @@ FORBIDDEN = [
     # the game process
     "OpenProcess", "ReadProcessMemory", "WriteProcessMemory", "CreateRemoteThread", "GetWindowThreadProcessId",
     "PrintWindow", "EnumProcessModules",
+    # may send the window a message (and block while the game is busy)
+    "GetWindowTextLength", "GetWindowTextLengthW",
 ]
 
 

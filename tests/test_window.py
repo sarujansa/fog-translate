@@ -41,10 +41,45 @@ def test_starting_without_key_or_notice_is_refused(app):
     win.toggle()
     assert not win.running and "Hinweis" in win.status.text()
     win.accept.setChecked(True)
-    win.toggle()
-    assert not win.running and "API-Key" in win.status.text()
+    win.toggle()                                      # starts at once; the missing key comes from the thread
+    assert win.running and "Startet" in win.status.text()
+    _wait(win, lambda: not win.running)
+    assert "API-Key" in win.status.text()
     _pick(win, "ollama")
     win.toggle()                                      # Ollama needs neither
     assert win.running
     win.toggle()
+    assert win.looper is None
     win.close()
+
+
+def _wait(win, done, seconds=10.0):
+    import time
+    end = time.monotonic() + seconds
+    while not done() and time.monotonic() < end:
+        win._pump()
+        time.sleep(0.02)
+    assert done()
+
+
+def test_the_last_sent_picture_can_be_shown(app):
+    import numpy as np
+    win = MainWindow(Settings())
+    win.show_last_picture()
+    assert "Noch nichts" in win.status.text()
+    win.engine.last_sent = np.zeros((40, 120, 3), np.uint8)
+    win.show_last_picture()
+    assert win._picture_view.pixmap().width() == 120
+    win._picture_view.close()
+    win.close()
+
+
+def test_the_logo_is_drawn_at_every_size(app):
+    from fogtranslate import icon
+    ic = icon.icon()
+    for n in icon.SIZES:
+        pm = icon.pixmap(n)
+        assert pm.width() == n and not pm.toImage().isNull()
+        corner, middle = pm.toImage().pixelColor(0, 0), pm.toImage().pixelColor(n // 2, n // 2)
+        assert corner.alpha() == 0 and middle.alpha() == 255      # rounded tile, opaque inside
+    assert len(ic.availableSizes()) == len(icon.SIZES)

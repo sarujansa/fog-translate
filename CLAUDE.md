@@ -41,10 +41,11 @@ Samsung G5 3440×1440, DBD (Steam/Epic/MS Store) im Fenster-Vollbild, rendert 16
 | `lines.py` | (rein) `ChatLine`, `SeenLines` (schon gezeigte Zeilen über `normal()` erkennen) |
 | `translate.py` | Gemeinsames aller Dienste: `SYSTEM`, `SCHEMA`, `LANGUAGES`, `png_bytes`, `parse`/`answer_lines`, `TranslateError.kind`, `Worker`-Thread |
 | `claude.py`, `gemini.py`, `ollama.py`, `services.py`, `http.py` | Dienste (je `Translator.request(img) → Result`): Claude per SDK (`MODELS`, `cost_usd`, Fallbacks), Gemini per REST (`responseJsonSchema`, einmal Rückfall auf `responseSchema`), Ollama lokal (`format` = Schema, `installed_models`); `services.make(settings)`, `SERVICES`, `KEY_SETTING`/`MODEL_SETTING`; `http.request` (Standardbibliothek) |
-| `engine.py` | Schleife ohne Qt: `look` (nur DBD vorn), `_try_send` (Abstand, Tageslimit), `answer`, `visible` |
-| `window.py`, `grab.py` | DBD-Fenster (nur Fensterinfos), mss-Ausschnitt |
+| `engine.py`, `looper.py` | Schleife ohne Qt: `look` (nur DBD vorn), `_try_send` (Abstand, Tageslimit), `answer`, `visible`, `last_sent` (nur Speicher, „Letzten Ausschnitt zeigen“); ein `RLock`, weil zwei Threads. `Looper` = Blick-Thread: baut den Übersetzer (SDK-Import dauert unter Windows Sekunden) und macht Fenster suchen/Aufnahme/Vergleich – **nie im Fenster-Thread**; meldet `started`/`start_failed`/`tick`/`answer` über die Queue |
+| `window.py`, `grab.py` | DBD-Fenster (nur Fensterinfos; Titel mit festem Puffer, keine Längenabfrage, die eine Nachricht schicken könnte), mss-Ausschnitt |
 | `secret.py`, `config.py` | DPAPI, `Settings` in `%LOCALAPPDATA%\FogTranslate` (`FOGTRANSLATE_DATA_DIR` in Tests; Keys je Dienst `api_key(service)`, `accepted(service)`, übernimmt 0.1-Schlüssel) |
-| `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig, von Aufnahmen ausgenommen), Bereich markieren, Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads), Start/`--test` |
+| `icon.py` | Logo per QPainter (zwei Sprechblasen + Nebel, `paint`/`pixmap`/`icon`, `SIZES`), `set_app_id` (eigenes Taskleisten-Symbol); `assets/logo.png` erzeugt `tools/export_logo.py` – nach Änderungen an der Zeichnung neu erzeugen |
+| `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig, von Aufnahmen ausgenommen), Bereich markieren, Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads), Start/`--test`; `__main__._log_setup`: Log, unbehandelte Fehler aller Threads ins Log, `faulthandler` → `crash.txt` |
 
 ## Starten, Testen
 

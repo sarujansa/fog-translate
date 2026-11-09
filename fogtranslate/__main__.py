@@ -7,12 +7,33 @@ import os
 import sys
 
 
+_CRASH = None          # kept open for faulthandler as long as the program runs
+
+
 def _log_setup():
+    """Log file + every uncaught error (window thread and other threads) + a hard crash/hang dump."""
+    global _CRASH
+    import faulthandler
+    import threading
+    from . import __version__
     from .config import data_dir
     folder = data_dir()
     os.makedirs(folder, exist_ok=True)
     logging.basicConfig(filename=os.path.join(folder, "fogtranslate.log"), level=logging.INFO, encoding="utf-8",
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+                        format="%(asctime)s %(levelname)s %(threadName)s %(name)s: %(message)s")
+    log = logging.getLogger("fogtranslate")
+    log.info("Fog Translate %s, Python %s", __version__, sys.version.split()[0])
+
+    def on_error(kind, value, tb):
+        log.error("Unerwarteter Fehler", exc_info=(kind, value, tb))
+
+    sys.excepthook = on_error
+    threading.excepthook = lambda a: on_error(a.exc_type, a.exc_value, a.exc_traceback)
+    try:
+        _CRASH = open(os.path.join(folder, "crash.txt"), "w", encoding="utf-8")
+        faulthandler.enable(_CRASH, all_threads=True)
+    except OSError:
+        pass
 
 
 def main(argv=None) -> int:

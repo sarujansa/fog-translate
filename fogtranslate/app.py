@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 import queue
 import sys
-import time
 from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer
@@ -14,6 +13,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout, 
 from . import __version__, geometry, ollama, services, translate, window
 from .config import Settings
 from .engine import Engine
+from .looper import Looper
 from .overlay import TranslationOverlay
 from .picker import RegionPicker
 
@@ -24,6 +24,7 @@ STATUS = {
     "no_region": "Noch kein Chat-Bereich markiert.",
     "no_game": "Dead by Daylight nicht gefunden – wartet.",
     "background": "DBD ist nicht im Vordergrund – pausiert.",
+    "starting": "Startet …",
     "watching": "Beobachtet den Chat …",
     "asking": "Frage Claude …",
     "cap": "Tageslimit an Anfragen erreicht – pausiert bis morgen.",
@@ -66,13 +67,11 @@ class MainWindow(QWidget):
         self.results: queue.Queue = queue.Queue()      # thread → window, emptied by a QTimer (no Qt signal)
         self.engine = Engine(settings, NoWorker())
         self.running = False
+        self.looper: Looper | None = None
         self.game = None
-        self._game_at = 0.0
-        self._grabber = None
         self.overlay = TranslationOverlay(settings["font_px"])
         self.picker = None
         self._build()
-        self.look_timer = QTimer(self, interval=int(float(settings["look_s"]) * 1000), timeout=self._look)
         self.pump_timer = QTimer(self, interval=200, timeout=self._pump)
         self.pump_timer.start()
         self._refresh()
@@ -87,8 +86,10 @@ class MainWindow(QWidget):
 
         row = QHBoxLayout()
         self.pick_btn = QPushButton("Chat-Bereich markieren", clicked=self.pick_region)
+        self.shot_btn = QPushButton("Letzten Ausschnitt zeigen", clicked=self.show_last_picture)
         self.run_btn = QPushButton("Starten", clicked=self.toggle)
         row.addWidget(self.pick_btn)
+        row.addWidget(self.shot_btn)
         row.addWidget(self.run_btn)
         root.addLayout(row)
 
@@ -242,6 +243,24 @@ class MainWindow(QWidget):
             self._start_worker()
         self._refresh()
 
+    def show_last_picture(self):
+        """The picture last sent to the service, exactly as cut out (only in memory, never a file)."""
+        img = self.engine.last_sent
+        if img is None:
+            self.status.setText("Noch nichts gesendet – erst starten und im Chat schreiben lassen.")
+            return
+        from PySide6.QtGui import QImage, QPixmap
+        import numpy as np
+        rgb = np.ascontiguousarray(np.asarray(img)[..., 2::-1])
+        h, w = rgb.shape[:2]
+        pic = QPixmap.fromImage(QImage(rgb.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy())
+        view = QLabel()
+        view.setWindowTitle("Gesendeter Ausschnitt – %d × %d px" % (w, h))
+        view.setPixmap(pic)
+        view.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self._picture_view = view
+        view.show()
+
     # ---------------------------------------------------------------- region
     def pick_region(self):
         game = window.find_game()
@@ -264,20 +283,28 @@ class MainWindow(QWidget):
         self._refresh()
 
     # ---------------------------------------------------------------- loop
-    def _start_worker(self) -> bool:
-        try:
-            translator = services.make(self.settings)
-        except translate.TranslateError as e:
-            self.engine.status, self.engine.error = "error", e.kind
-            self.engine.worker = NoWorker()
-            return False
-        self.engine.worker = translate.Worker(translator, self.results.put)
-        return True
+    def _start_looper(self):
+        """(Re)start the look thread; it builds the translator itself, so the window never waits."""
+        self._stop_looper()
+        self.engine.worker = NoWorker()
+        self.engine.status, self.engine.error = "starting", ""
+        settings = self.settings
+        log.info("Start: Dienst %s", settings["service"])
+        self.looper = Looper(self.engine, lambda: services.make(settings), self.results.put, settings["look_s"])
+        self.looper.start()
+
+    def _stop_looper(self):
+        if self.looper is not None:
+            self.looper.stop()
+            self.looper = None
+
+    def _start_worker(self):            # settings changed while running
+        self._start_looper()
 
     def toggle(self):
         if self.running:
             self.running = False
-            self.look_timer.stop()
+            self._stop_looper()
             self.engine.status = "idle"
             self.overlay.hide()
         else:
@@ -285,42 +312,34 @@ class MainWindow(QWidget):
             if not self.settings.accepted(service):
                 self.status.setText("Bitte erst den Hinweis unten bestätigen.")
                 return
-            if not self._start_worker():
-                self._refresh()
-                return
             self.running = True
-            self.look_timer.start()
-        self._refresh()
-
-    def _look(self):
-        now = time.monotonic()
-        if self.game is None or now - self._game_at > 1.0:
-            self.game = window.find_game()
-            self._game_at = now
-        if self._grabber is None:
-            from .grab import Grabber
-            self._grabber = Grabber()
-        try:
-            self.engine.look(self.game, window.game_in_front(self.game), self._grabber.grab)
-        except Exception:
-            log.exception("Blick fehlgeschlagen")
-        self._refresh_overlay()
+            self._start_looper()
         self._refresh()
 
     def _pump(self):
         while True:
             try:
-                outcome = self.results.get_nowait()
+                kind, value = self.results.get_nowait()
             except queue.Empty:
                 break
-            new = self.engine.answer(outcome)
-            self.settings.save()
-            for ln in new:
-                self.history.addItem(_history_text(ln))
-            while self.history.count() > 200:
-                self.history.takeItem(0)
-            if new:
-                self.history.scrollToBottom()
+            if kind == "tick":
+                self.game = value
+            elif kind == "started":
+                if self.engine.status == "starting":
+                    self.engine.status = "idle"
+            elif kind == "start_failed":
+                self.running = False
+                self._stop_looper()
+                self.engine.status, self.engine.error = "error", value.kind
+            elif kind == "answer":
+                new = self.engine.answer(value)
+                self.settings.save()
+                for ln in new:
+                    self.history.addItem(_history_text(ln))
+                while self.history.count() > 200:
+                    self.history.takeItem(0)
+                if new:
+                    self.history.scrollToBottom()
         if self.running:
             self._refresh_overlay()
         self._refresh()
@@ -338,7 +357,8 @@ class MainWindow(QWidget):
 
     def _refresh(self):
         e = self.engine
-        text = STATUS.get(e.status, e.status) if self.running or e.status != "watching" else STATUS["idle"]
+        text = STATUS.get(e.status, e.status) if self.running or e.status not in ("watching", "starting") \
+            else STATUS["idle"]
         if not self.running and self.settings["region"] is None:
             text = STATUS["no_region"]
         if e.status == "error":
@@ -351,10 +371,8 @@ class MainWindow(QWidget):
                            % (self.settings.requests_today(now.strftime("%Y-%m-%d")), spent))
 
     def closeEvent(self, event):
-        self.look_timer.stop()
+        self._stop_looper()
         self.overlay.close()
-        if self._grabber is not None:
-            self._grabber.close()
         super().closeEvent(event)
 
 
@@ -369,7 +387,10 @@ def run(argv=None) -> int:
     import os
     # Qt coordinates = physical pixels, like the Win32 window rectangles and mss
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "0")
+    from . import icon
+    icon.set_app_id()
     app = QApplication.instance() or QApplication(argv or sys.argv)
+    app.setWindowIcon(icon.icon())
     settings = Settings()
     win = MainWindow(settings)
     win.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)

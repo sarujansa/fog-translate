@@ -1,3 +1,5 @@
+<img src="assets/logo.png" alt="" width="96" align="right">
+
 # Fog Translate
 
 Live-Übersetzung des **Dead by Daylight**-Chats. Du markierst einmal den Chat-Bereich; sobald dort neue Zeilen
@@ -42,6 +44,12 @@ füllt die Liste mit den installierten Modellen.
 
 Test ohne Spiel: `.venv\Scripts\python -m fogtranslate --test chat.png [--service gemini]` übersetzt einen
 Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_API_KEY`.
+
+## Wenn etwas nicht stimmt
+
+- **„Letzten Ausschnitt zeigen“** zeigt genau das Bild, das zuletzt verschickt wurde. Sind Zeilen rechts
+  abgeschnitten, den Bereich neu markieren – etwas breiter als der Chat.
+- Log: `%LOCALAPPDATA%\FogTranslate\fogtranslate.log`, bei einem Absturz zusätzlich `crash.txt`.
 
 ## Einstellungen
 
