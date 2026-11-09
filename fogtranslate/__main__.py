@@ -18,21 +18,21 @@ def _log_setup():
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="fogtranslate")
     ap.add_argument("--test", metavar="BILD", help="ein Bild (Chat-Ausschnitt) einmal übersetzen")
+    ap.add_argument("--service", choices=("claude", "gemini", "ollama"), help="Dienst für --test")
     args = ap.parse_args(argv)
     _log_setup()
     if args.test:
         import numpy as np
         from PIL import Image
         from .config import Settings
-        from .translate import TranslateError, Translator
+        from . import services
+        from .translate import TranslateError
         s = Settings()
-        key = s.api_key()
-        if not key:
-            print("Kein API-Key (Einstellungen oder ANTHROPIC_API_KEY).")
-            return 2
+        if args.service:
+            s["service"] = args.service
         img = np.asarray(Image.open(args.test).convert("RGB"))[..., ::-1]
         try:
-            res = Translator(key, s["model"], s["target"]).request(img)
+            res = services.make(s).request(img)
         except TranslateError as e:
             print("Fehler:", e.kind)
             return 1

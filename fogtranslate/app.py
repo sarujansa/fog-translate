@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QListWidget, QPushButton, QVBoxLayout, QWidget)
 
-from . import __version__, geometry, translate, window
+from . import __version__, geometry, ollama, services, translate, window
 from .config import Settings
 from .engine import Engine
 from .overlay import TranslationOverlay
@@ -31,14 +31,24 @@ STATUS = {
 }
 ERRORS = {
     "key": "API-Key fehlt oder ist ungültig.",
-    "quota": "Limit oder Guthaben bei Anthropic erreicht.",
-    "net": "Keine Verbindung zu Anthropic.",
-    "refused": "Claude hat diese Anfrage abgelehnt.",
-    "answer": "Antwort von Claude nicht lesbar.",
+    "quota": "Limit, Kontingent oder Guthaben beim Dienst erreicht.",
+    "net": "Keine Verbindung zum Dienst.",
+    "refused": "Der Dienst hat diese Anfrage abgelehnt.",
+    "answer": "Antwort des Dienstes nicht lesbar.",
+    "model": "Modell nicht gefunden – Namen prüfen (bei Ollama: „ollama pull <Modell>“).",
+    "server": "Ollama läuft nicht (oder ein anderer Port ist eingestellt).",
     "other": "Unerwarteter Fehler (siehe Log).",
 }
-NOTICE = ("Ich weiß: Das Bild des markierten Bereichs (kann Spielernamen zeigen) wird zum Übersetzen an Anthropic "
-          "(Claude) geschickt – mit meinem eigenen API-Key, auf meine Kosten.")
+NOTICES = {
+    "claude": ("Das Bild des markierten Bereichs (kann Spielernamen und Nachrichten anderer Spieler zeigen) wird "
+               "zum Übersetzen an Anthropic geschickt – mit deinem eigenen API-Key, auf deine Kosten."),
+    "gemini": ("Das Bild des markierten Bereichs (kann Spielernamen und Nachrichten anderer Spieler zeigen) wird "
+               "zum Übersetzen an Google geschickt. In der kostenlosen Stufe darf Google die Daten zur "
+               "Verbesserung seiner Produkte nutzen und Menschen können sie lesen."),
+    "ollama": ("Ollama läuft auf deinem PC – das Bild verlässt den Rechner nicht. Ollama installieren "
+               "(ollama.com) und ein Bildmodell laden, z. B. „ollama pull qwen2.5vl:7b“ (ca. 6 GB, braucht eine "
+               "Grafikkarte mit ≥ 8 GB) oder „gemma3:4b“ für schwächere Karten."),
+}
 
 
 class NoWorker:
@@ -90,32 +100,45 @@ class MainWindow(QWidget):
         self.target.setCurrentIndex(list(translate.LANGUAGES).index(s["target"]))
         self.target.currentIndexChanged.connect(self._settings_changed)
         grid.addWidget(self.target, 0, 1)
-        grid.addWidget(QLabel("Modell:"), 1, 0)
+        grid.addWidget(QLabel("Dienst:"), 1, 0)
+        self.service = QComboBox()
+        for sid, (label, _cloud) in services.SERVICES.items():
+            self.service.addItem(label, sid)
+        self.service.setCurrentIndex(list(services.SERVICES).index(s["service"]))
+        self.service.currentIndexChanged.connect(self._service_changed)
+        grid.addWidget(self.service, 1, 1)
+        grid.addWidget(QLabel("Modell:"), 2, 0)
+        model_row = QHBoxLayout()
         self.model = QComboBox()
-        for mid, (label, *_rest) in translate.MODELS.items():
-            self.model.addItem(label, mid)
-        self.model.setCurrentIndex(list(translate.MODELS).index(s["model"]))
-        self.model.currentIndexChanged.connect(self._settings_changed)
-        grid.addWidget(self.model, 1, 1)
-        grid.addWidget(QLabel("Anthropic API-Key:"), 2, 0)
+        self.model.activated.connect(self._settings_changed)
+        self._edit_hooked = None
+        model_row.addWidget(self.model, 1)
+        self.local_btn = QPushButton("Lokale Modelle laden", clicked=self._load_local_models)
+        model_row.addWidget(self.local_btn)
+        grid.addLayout(model_row, 2, 1)
+        self.key_label = QLabel("API-Key:")
+        grid.addWidget(self.key_label, 3, 0)
         key_row = QHBoxLayout()
         self.key = QLineEdit()
         self.key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.key.setPlaceholderText("gespeichert" if s["api_key"] else "sk-ant-…")
         key_row.addWidget(self.key)
-        key_row.addWidget(QPushButton("Speichern", clicked=self._save_key))
-        grid.addLayout(key_row, 2, 1)
+        self.key_btn = QPushButton("Speichern", clicked=self._save_key)
+        key_row.addWidget(self.key_btn)
+        grid.addLayout(key_row, 3, 1)
+        self.key_link = QLabel()
+        self.key_link.setOpenExternalLinks(True)
+        self.key_link.setTextFormat(Qt.TextFormat.RichText)
+        grid.addWidget(self.key_link, 4, 1)
         root.addLayout(grid)
 
         self.show_all = QCheckBox("Auch Zeilen in meiner Sprache zeigen")
         self.show_all.setChecked(bool(s["show_all"]))
         self.show_all.toggled.connect(self._settings_changed)
         root.addWidget(self.show_all)
-        notice = QLabel(NOTICE)
-        notice.setWordWrap(True)
-        root.addWidget(notice)
+        self.notice = QLabel()
+        self.notice.setWordWrap(True)
+        root.addWidget(self.notice)
         self.accept = QCheckBox("Verstanden")
-        self.accept.setChecked(bool(s["accepted"]))
         self.accept.toggled.connect(self._settings_changed)
         root.addWidget(self.accept)
 
@@ -123,24 +146,96 @@ class MainWindow(QWidget):
         root.addWidget(self.history, 1)
         self.costs = QLabel()
         root.addWidget(self.costs)
-        self.resize(520, 480)
+        self.resize(560, 560)
+        self._service_ui()
+
+    def _service_ui(self):
+        """Model list, key row and notice for the chosen service."""
+        s = self.settings
+        service = s["service"]
+        self._filling = True
+        self.model.clear()
+        for mid, label in services.model_choices(service):
+            self.model.addItem(label, mid)
+        current = s[services.MODEL_SETTING[service]]
+        i = self.model.findData(current)
+        if i < 0:
+            self.model.addItem(current, current)
+            i = self.model.count() - 1
+        self.model.setCurrentIndex(i)
+        self.model.setEditable(service != "claude")
+        edit = self.model.lineEdit()
+        if edit is not None and edit is not self._edit_hooked:
+            edit.editingFinished.connect(self._settings_changed)
+            self._edit_hooked = edit
+        cloud = services.is_cloud(service)
+        for w in (self.key_label, self.key, self.key_btn, self.key_link):
+            w.setVisible(cloud)
+        self.local_btn.setVisible(service == "ollama")
+        self.key.clear()
+        self.key.setPlaceholderText("gespeichert" if s.has_stored_key(service) else "API-Key einfügen")
+        if cloud:
+            url = services.KEY_URL[service]
+            self.key_link.setText('Key holen: <a href="%s">%s</a>' % (url, url))
+        self.notice.setText(NOTICES[service])
+        self.accept.setVisible(cloud)
+        self.accept.setChecked(s.accepted(service))
+        self._filling = False
+
+    def _model_text(self) -> str:
+        i = self.model.currentIndex()
+        text = self.model.currentText().strip()
+        if i >= 0 and self.model.itemText(i) == text and self.model.itemData(i):
+            return str(self.model.itemData(i))
+        return text
+
+    def _service_changed(self):
+        self.settings["service"] = self.service.currentData()
+        self.settings.save()
+        self._service_ui()
+        if self.running:
+            self._start_worker()
+        self._refresh()
 
     def _settings_changed(self):
+        if getattr(self, "_filling", False):
+            return
         s = self.settings
+        service = s["service"]
         s["target"] = self.target.currentData()
-        s["model"] = self.model.currentData()
+        model = self._model_text()
+        if services.valid_model(service, model):
+            s[services.MODEL_SETTING[service]] = model
         s["show_all"] = self.show_all.isChecked()
-        s["accepted"] = self.accept.isChecked()
+        if services.is_cloud(service):
+            s.set_accepted(service, self.accept.isChecked())
         s.save()
         if self.running:
             self._start_worker()
         self._refresh()
 
+    def _load_local_models(self):
+        names = ollama.installed_models(int(self.settings["ollama_port"]))
+        if not names:
+            self.status.setText(ERRORS["server"] + " Oder noch kein Modell geladen.")
+            return
+        self._filling = True
+        current = self._model_text()
+        self.model.clear()
+        for n in names:
+            self.model.addItem(n, n)
+        i = self.model.findData(current)
+        self.model.setCurrentIndex(i if i >= 0 else 0)
+        self._filling = False
+        self._settings_changed()
+        self.status.setText("%d lokale Modelle gefunden." % len(names))
+
     def _save_key(self):
         text = self.key.text().strip()
-        if not text:
+        service = self.settings["service"]
+        if not text or not services.is_cloud(service):
             return
-        stored = self.settings.set_api_key(text)
+        stored = self.settings.set_api_key(service, text)
         self.key.clear()
         self.key.setPlaceholderText("gespeichert" if stored else "nur für diese Sitzung")
         if self.running:
@@ -169,10 +264,15 @@ class MainWindow(QWidget):
         self._refresh()
 
     # ---------------------------------------------------------------- loop
-    def _start_worker(self):
-        self.engine.worker = translate.Worker(
-            translate.Translator(self.settings.api_key(), self.settings["model"], self.settings["target"]),
-            self.results.put)
+    def _start_worker(self) -> bool:
+        try:
+            translator = services.make(self.settings)
+        except translate.TranslateError as e:
+            self.engine.status, self.engine.error = "error", e.kind
+            self.engine.worker = NoWorker()
+            return False
+        self.engine.worker = translate.Worker(translator, self.results.put)
+        return True
 
     def toggle(self):
         if self.running:
@@ -181,13 +281,13 @@ class MainWindow(QWidget):
             self.engine.status = "idle"
             self.overlay.hide()
         else:
-            if not self.settings["accepted"]:
+            service = self.settings["service"]
+            if not self.settings.accepted(service):
                 self.status.setText("Bitte erst den Hinweis unten bestätigen.")
                 return
-            if not self.settings.api_key():
-                self.status.setText(ERRORS["key"])
+            if not self._start_worker():
+                self._refresh()
                 return
-            self._start_worker()
             self.running = True
             self.look_timer.start()
         self._refresh()

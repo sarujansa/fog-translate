@@ -1,7 +1,8 @@
 # Fog Translate – Projektkontext für Claude Code
 
 Live-Übersetzung des Dead-by-Daylight-Chats (Windows). Der Nutzer markiert den Chat-Bereich; bei neuen, ruhigen
-Zeilen schickt das Programm das Bild des Bereichs an Claude (liest + erkennt Sprache + übersetzt in einem Schritt)
+Zeilen schickt das Programm das Bild des Bereichs an den gewählten Dienst – Claude, Gemini oder lokal Ollama (liest +
+erkennt Sprache + übersetzt in einem Schritt)
 und zeigt neue fremdsprachige Zeilen in einem klickdurchlässigen Fenster über dem Chat. Eigenständig, unabhängig
 von Fog Scout (`sarujansa/fog-scout`); Code daraus darf kopiert werden (gleicher Autor). Oberfläche/Doku Deutsch,
 Code und Kommentare Englisch.
@@ -14,10 +15,13 @@ Code und Kommentare Englisch.
   Spieldateien. Erlaubt: Bildschirmpixel (mss), Fensterinfos (Klasse `UnrealWindow`, Titel, Position,
   Vordergrund), `SetWindowDisplayAffinity` nur auf eigenen Fenstern. Nie `PrintWindow`.
 - Gelesen wird nur der markierte Bereich und nur, solange DBD das aktive Fenster ist.
-- **Internet nur zum gewählten Übersetzungsdienst** (`translate.py`); gesendet nur das Bild des Bereichs (PNG im
-  Speicher, nie als Datei) und die Zielsprache. Vor dem ersten Start bestätigt der Nutzer, dass das Bild
-  Spielernamen zeigen kann (`accepted`). Grenzen: `min_gap_s`, `daily_cap`, nur bei geändertem + ruhigem Bild
-  (`change.ChangeGate`).
+- **Netz nur zum gewählten Übersetzungsdienst** (`claude.py` → api.anthropic.com über das SDK, `gemini.py` →
+  `gemini.HOST`, Key nur im Header `x-goog-api-key`, nie in der URL; `ollama.py` → nur `127.0.0.1`, `HOST` fest,
+  nur der Port einstellbar); HTTP nur über `http.py` (keine Weiterleitungen, Antwort ≤ `MAX_BYTES`). Gesendet nur
+  das Bild des Bereichs (PNG im Speicher, nie als Datei) und die Zielsprache. Vor dem ersten Start eines
+  Cloud-Dienstes bestätigt der Nutzer, dass das Bild Spielernamen/Nachrichten anderer zeigen kann (`accepted` je
+  Dienst; bei Gemini mit Hinweis auf die Datennutzung der kostenlosen Stufe). Grenzen: `min_gap_s`, `daily_cap`, nur bei geändertem + ruhigem Bild
+  (`change.ChangeGate`), Gemini ≥ `engine.SERVICE_GAP_S`, nach „Limit erreicht“ `QUOTA_WAIT_S` Pause.
 - API-Key nur DPAPI-verschlüsselt (`secret.py`), nie Klartext, nie ins Log; ohne DPAPI nur für die Sitzung.
 - Antworten des Dienstes nur als Klartext anzeigen, Steuerzeichen/Bidi entfernt (`translate.parse`).
 - Wächter: `tests/test_guards.py`. Neue Features, die gegen diese Regeln verstoßen: nachfragen.
@@ -35,10 +39,11 @@ Samsung G5 3440×1440, DBD (Steam/Epic/MS Store) im Fenster-Vollbild, rendert 16
 | `geometry.py` | (rein) `viewport`, `to_relative`/`from_relative`, `valid_region`, `overlay_spot` |
 | `change.py` | (rein) `ChangeGate`: Anfrage nur bei geändertem Bild, `SETTLE_LOOKS` ruhig, nicht bei leerem Bereich |
 | `lines.py` | (rein) `ChatLine`, `SeenLines` (schon gezeigte Zeilen über `normal()` erkennen) |
-| `translate.py` | Claude (SDK `anthropic`, Bild + strukturierte Ausgabe `SCHEMA`, `MODELS`, Kosten `cost_usd`, `parse`, `TranslateError.kind`, `Worker`-Thread) |
+| `translate.py` | Gemeinsames aller Dienste: `SYSTEM`, `SCHEMA`, `LANGUAGES`, `png_bytes`, `parse`/`answer_lines`, `TranslateError.kind`, `Worker`-Thread |
+| `claude.py`, `gemini.py`, `ollama.py`, `services.py`, `http.py` | Dienste (je `Translator.request(img) → Result`): Claude per SDK (`MODELS`, `cost_usd`, Fallbacks), Gemini per REST (`responseJsonSchema`, einmal Rückfall auf `responseSchema`), Ollama lokal (`format` = Schema, `installed_models`); `services.make(settings)`, `SERVICES`, `KEY_SETTING`/`MODEL_SETTING`; `http.request` (Standardbibliothek) |
 | `engine.py` | Schleife ohne Qt: `look` (nur DBD vorn), `_try_send` (Abstand, Tageslimit), `answer`, `visible` |
 | `window.py`, `grab.py` | DBD-Fenster (nur Fensterinfos), mss-Ausschnitt |
-| `secret.py`, `config.py` | DPAPI, `Settings` in `%LOCALAPPDATA%\FogTranslate` (`FOGTRANSLATE_DATA_DIR` in Tests) |
+| `secret.py`, `config.py` | DPAPI, `Settings` in `%LOCALAPPDATA%\FogTranslate` (`FOGTRANSLATE_DATA_DIR` in Tests; Keys je Dienst `api_key(service)`, `accepted(service)`, übernimmt 0.1-Schlüssel) |
 | `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig, von Aufnahmen ausgenommen), Bereich markieren, Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads), Start/`--test` |
 
 ## Starten, Testen

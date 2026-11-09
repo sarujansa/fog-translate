@@ -14,6 +14,8 @@ from .lines import ChatLine, SeenLines
 from .translate import Result, TranslateError
 
 KEEP_SHOWN = 8
+QUOTA_WAIT_S = 60.0              # after a "limit reached" answer, wait at least this long
+SERVICE_GAP_S = {"gemini": 6.5}  # Gemini's free tier allows about 10 requests a minute
 
 
 class Engine:
@@ -28,6 +30,7 @@ class Engine:
         self.status = "idle"         # idle | no_region | no_game | background | watching | asking | cap | error
         self.error = ""
         self._last_request = -1e9
+        self._not_before = -1e9      # after a limit answer
         self._pending = None
 
     def region_on_screen(self, game) -> tuple[int, int, int, int] | None:
@@ -65,7 +68,8 @@ class Engine:
 
     def _try_send(self):
         t = self.clock()
-        if self.worker.busy or t - self._last_request < float(self.settings["min_gap_s"]):
+        gap = max(float(self.settings["min_gap_s"]), SERVICE_GAP_S.get(self.settings["service"], 0.0))
+        if self.worker.busy or t - self._last_request < gap or t < self._not_before:
             return
         day = self.now().strftime("%Y-%m-%d")
         if self.settings.requests_today(day) >= int(self.settings["daily_cap"]):
@@ -83,6 +87,8 @@ class Engine:
         if isinstance(outcome, TranslateError):
             self.status = "error"
             self.error = outcome.kind
+            if outcome.kind == "quota":
+                self._not_before = self.clock() + QUOTA_WAIT_S
             return []
         assert isinstance(outcome, Result)
         self.settings.count_request(n.strftime("%Y-%m-%d"), n.strftime("%Y-%m"), outcome.cost_usd)

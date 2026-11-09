@@ -7,7 +7,7 @@ import os
 import sys
 import tempfile
 
-from . import geometry, translate
+from . import geometry, services, translate
 
 log = logging.getLogger(__name__)
 APP_DIR = "FogTranslate"
@@ -16,9 +16,14 @@ ENV = "FOGTRANSLATE_DATA_DIR"            # tests
 DEFAULTS = {
     "region": None,                  # [x, y, w, h] relative to the 16:9 viewport
     "target": "de",
-    "model": translate.DEFAULT_MODEL,
-    "api_key": "",                   # "dpapi:…" only
-    "accepted": False,               # the user has read that pictures go to Anthropic
+    "service": services.DEFAULT,     # claude | gemini | ollama
+    "claude_model": services.DEFAULT_MODEL["claude"],
+    "gemini_model": services.DEFAULT_MODEL["gemini"],
+    "ollama_model": services.DEFAULT_MODEL["ollama"],
+    "ollama_port": 11434,
+    "claude_key": "",                # "dpapi:…" only
+    "gemini_key": "",                # "dpapi:…" only
+    "accepted": [],                  # cloud services whose notice the user confirmed
     "look_s": 1.0,                   # seconds between looks at the region
     "min_gap_s": 3.0,                # at least this long between two requests
     "daily_cap": 300,                # requests per day at most
@@ -46,7 +51,7 @@ class Settings:
         self.folder = folder or data_dir()
         self.path = os.path.join(self.folder, "settings.json")
         self.values = dict(DEFAULTS)
-        self.session_key = ""        # key kept only for this run (no DPAPI)
+        self.session_keys: dict[str, str] = {}      # keys kept only for this run (no DPAPI)
         self._load()
 
     def _load(self):
@@ -59,6 +64,13 @@ class Settings:
             log.warning("Einstellungen nicht lesbar (%s) – Standardwerte", type(e).__name__)
             return
         if isinstance(data, dict):
+            # 0.1 had one service: "api_key"/"model" were Claude's, "accepted" a bool
+            if "api_key" in data and "claude_key" not in data:
+                data["claude_key"] = data["api_key"]
+            if "model" in data and "claude_model" not in data:
+                data["claude_model"] = data["model"]
+            if isinstance(data.get("accepted"), bool):
+                data["accepted"] = ["claude"] if data["accepted"] else []
             for k, v in data.items():
                 if k in DEFAULTS and (DEFAULTS[k] is None or isinstance(v, type(DEFAULTS[k]))
                                       or (isinstance(DEFAULTS[k], float) and isinstance(v, int))):
@@ -67,8 +79,14 @@ class Settings:
             self.values["region"] = None
         if self.values["target"] not in translate.LANGUAGES:
             self.values["target"] = "de"
-        if self.values["model"] not in translate.MODELS:
-            self.values["model"] = translate.DEFAULT_MODEL
+        if self.values["service"] not in services.SERVICES:
+            self.values["service"] = services.DEFAULT
+        for service, key in services.MODEL_SETTING.items():
+            if not services.valid_model(service, self.values[key]):
+                self.values[key] = services.DEFAULT_MODEL[service]
+        self.values["accepted"] = [x for x in self.values["accepted"] if x in services.SERVICES]
+        if not 1 <= int(self.values["ollama_port"]) <= 65535:
+            self.values["ollama_port"] = 11434
 
     def __getitem__(self, key):
         return self.values[key]
@@ -92,24 +110,42 @@ class Settings:
                 pass
             raise
 
-    # ---- key
-    def api_key(self) -> str:
-        from . import secret
-        return self.session_key or secret.unprotect(self.values["api_key"]) or os.environ.get("ANTHROPIC_API_KEY", "")
+    # ---- keys
+    ENV_KEYS = {"claude": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY"}
 
-    def set_api_key(self, key: str) -> bool:
+    def api_key(self, service: str) -> str:
+        from . import secret
+        setting = services.KEY_SETTING.get(service)
+        if setting is None:
+            return ""
+        return (self.session_keys.get(service) or secret.unprotect(self.values[setting])
+                or os.environ.get(self.ENV_KEYS[service], ""))
+
+    def has_stored_key(self, service: str) -> bool:
+        setting = services.KEY_SETTING.get(service)
+        return bool(setting and (self.values[setting] or self.session_keys.get(service)))
+
+    def set_api_key(self, service: str, key: str) -> bool:
         """True = stored encrypted; False = kept for this session only."""
         from . import secret
+        setting = services.KEY_SETTING[service]
         key = key.strip()
         try:
-            self.values["api_key"] = secret.protect(key)
-            self.session_key = ""
+            self.values[setting] = secret.protect(key)
+            self.session_keys.pop(service, None)
             self.save()
             return True
         except secret.CannotProtect:
-            self.values["api_key"] = ""
-            self.session_key = key
+            self.values[setting] = ""
+            self.session_keys[service] = key
             return False
+
+    def accepted(self, service: str) -> bool:
+        return not services.is_cloud(service) or service in self.values["accepted"]
+
+    def set_accepted(self, service: str, yes: bool):
+        rest = [x for x in self.values["accepted"] if x != service]
+        self.values["accepted"] = rest + ([service] if yes else [])
 
     # ---- counters
     def count_request(self, day: str, month: str, usd: float):
