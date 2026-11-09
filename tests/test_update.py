@@ -59,3 +59,12 @@ def test_packages_are_reinstalled_only_when_requirements_changed(tmp_path):
     assert not deps.needed(str(req), str(stamp))
     req.write_bytes(b"a==2\n")                                           # after an update
     assert deps.needed(str(req), str(stamp))
+
+
+def test_the_installed_exe_never_uses_git_and_points_to_the_releases(monkeypatch):
+    import sys
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert update.frozen() and not update.is_git_checkout()
+    assert update.download_page() == "https://github.com/sarujansa/fog-translate/releases/latest"
+    c = update.check(fetch_version=lambda: '__version__ = "99.0"')
+    assert c.state == "newer"

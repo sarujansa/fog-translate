@@ -51,7 +51,15 @@ nebeneinander.
 Bei Ollama spricht das Programm nur mit `127.0.0.1` (Port einstellbar, Standard 11434). „Load local models“
 füllt die Liste mit den installierten Modellen.
 
-## Starten
+## Installieren
+
+**Einfach:** Unter [Releases](https://github.com/sarujansa/fog-translate/releases/latest) die Datei
+`FogTranslate-Setup-<Version>.exe` laden und starten – keine Admin-Rechte, kein Python nötig. Das Setup ist nicht
+signiert: Windows SmartScreen fragt beim ersten Start (Weitere Informationen → Trotzdem ausführen). Updates:
+**Check for updates** zeigt eine neue Version und öffnet die Release-Seite; das neue Setup installiert über die
+alte Fassung, Einstellungen und Keys bleiben.
+
+**Aus dem Quelltext:**
 
 1. Python 3.12–3.14 von python.org installieren.
 2. `start.bat` doppelklicken (beim ersten Mal werden die Pakete installiert, alle Versionen fest und per SHA-256

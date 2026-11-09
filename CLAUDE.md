@@ -37,6 +37,12 @@ Abhängigkeiten in `THIRD_PARTY.md` eintragen (Wächter `test_every_package_is_l
   Commits; Neustart über `start.bat`. ZIP-Installation: nur die Versionszeile von `update.VERSION_URL` lesen und die
   Seite öffnen, nichts herunterladen. Nichts über den Nutzer senden. `start.bat` → `deps.py` installiert Pakete neu,
   wenn sich `requirements.txt` geändert hat (SHA-256 in `.venv\requirements.sha256`).
+- **.exe/Setup** (0.8): `installer/fogtranslate.spec` (PyInstaller 6.22.3 fest, `requirements-build.txt` mit
+  SHA-256), `installer/fogtranslate.iss` (Inno Setup 7.1.1 fest + Prüfsumme, nur für den Benutzer, keine
+  Admin-Rechte, `{localappdata}\Programs\Fog Translate`). `.github/workflows/build.yml`: Bau, `--selftest` der .exe,
+  Setup still installieren/prüfen/deinstallieren; Job `release` (einziger mit `contents: write`) nur bei Push auf
+  `main` und nur wenn es `v<Version>` noch nicht gibt. Die .exe aktualisiert nie selbst: „Check for updates“ liest
+  die Versionszeile und öffnet `update.RELEASES_URL`.
 - API-Key nur DPAPI-verschlüsselt (`secret.py`), nie Klartext, nie ins Log; ohne DPAPI nur für die Sitzung.
 - Antworten des Dienstes nur als Klartext anzeigen, Steuerzeichen/Bidi entfernt (`translate.parse`).
 - Wächter: `tests/test_guards.py`. Neue Features, die gegen diese Regeln verstoßen: nachfragen.
@@ -68,7 +74,8 @@ kamen die Klicks beim Nutzer nicht an). `QT_ENABLE_HIGHDPI_SCALING=0` bleibt zus
 | `secret.py`, `config.py` | DPAPI, `Settings` in `%LOCALAPPDATA%\FogTranslate` (`FOGTRANSLATE_DATA_DIR` in Tests; Keys je Dienst `api_key(service)`, `accepted(service)`, übernimmt 0.1-Schlüssel) |
 | `update.py`, `deps.py` | Update auf Klick (`check` → `Check.state` current/behind/ahead/dirty/branch/newer/error, `apply` = `merge --ff-only`, `restart`), Pakete nach Update (`needed`, `main`, nur Standardbibliothek) |
 | `qtgeom.py` | Physische ↔ Qt-Pixel (`ratio` = devicePixelRatio des Hauptbildschirms) |
-| `icon.py` | Logo per QPainter (zwei Sprechblasen + Nebel, `paint`/`pixmap`/`icon`, `SIZES`), `set_app_id` (eigenes Taskleisten-Symbol); `assets/logo.png` erzeugt `tools/export_logo.py` – nach Änderungen an der Zeichnung neu erzeugen |
+| `selftest.py` | `--selftest RESULT.json`: Module, Bibliotheken, Fenster offscreen, Logo; JSON, Exit 0 = ok (CI prüft die .exe damit) |
+| `icon.py` | Logo per QPainter (zwei Sprechblasen + Nebel, `paint`/`pixmap`/`icon`, `SIZES`), `set_app_id` (eigenes Taskleisten-Symbol), `ico_bytes`/`save_ico` (für .exe und Setup); `assets/logo.png` erzeugt `tools/export_logo.py` – nach Änderungen an der Zeichnung neu erzeugen |
 | `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig; je Nachricht Kopfzeile Sprache + Name, Übersetzung, Original klein; Messen und Zeichnen über dieselben `rows`/`_height`), Verlauf `history_html` (alles escaped), Bereich markieren (`app.pick_region`: eigene Fenster weg, nach 350 ms ein mss-Bild des Spielfensters → `RegionPicker(picture, done, current)` mit `Canvas` in Bildpixeln, Save/Cancel/Esc/Enter/×), Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads), Start/`--test`; `__main__._log_setup`: Log, unbehandelte Fehler aller Threads ins Log, `faulthandler` → `crash.txt` |
 
 ## Starten, Testen

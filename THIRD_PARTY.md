@@ -31,3 +31,8 @@ to them.
 
 Qt / PySide6 wird unter der LGPL-3.0 genutzt (dynamisch geladen, unverändert). / Qt / PySide6 is used under the
 LGPL-3.0 (dynamically loaded, unmodified).
+
+Die installierte .exe wird mit **PyInstaller** gebaut (GPL-2.0 mit Ausnahme für damit gebaute Programme) und das
+Setup mit **Inno Setup** (eigene, freie Lizenz). / The installed .exe is built with **PyInstaller** (GPL-2.0 with an
+exception for programs built with it), the setup with **Inno Setup** (its own free license).
+
