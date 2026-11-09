@@ -52,3 +52,20 @@ def test_each_service_reaches_only_its_own_host():
 def test_the_key_never_goes_to_the_log():
     for name, text in _sources():
         assert not re.search(r"log\w*\.\w+\(.*(api_key|key\b)", text), name
+
+
+def test_every_package_is_listed_in_third_party():
+    root = os.path.dirname(ROOT)
+    with open(os.path.join(root, "requirements.txt"), encoding="utf-8") as fh:
+        names = [re.split(r"==", line)[0].strip() for line in fh if re.match(r"^[A-Za-z]", line)]
+    with open(os.path.join(root, "THIRD_PARTY.md"), encoding="utf-8") as fh:
+        listed = fh.read().lower().replace("_", "-")
+    missing = [n for n in names if n.lower().replace("_", "-") not in listed]
+    assert not missing, missing
+
+
+def test_the_license_keeps_modifying_behind_permission():
+    root = os.path.dirname(ROOT)
+    with open(os.path.join(root, "LICENSE"), encoding="utf-8") as fh:
+        text = fh.read()
+    assert "written permission" in text and "schriftlicher Erlaubnis" in text

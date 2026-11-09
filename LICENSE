@@ -1,0 +1,94 @@
+Fog Translate – Nutzungsbedingungen / Terms of use
+Copyright (c) 2026 sarujansa. Alle Rechte vorbehalten. All rights reserved.
+
+DEUTSCH
+
+1. Nutzung und Weitergabe. Du darfst Fog Translate kostenlos herunterladen und benutzen.
+   Du darfst das Programm unverändert und kostenlos an andere weitergeben, wenn diese
+   Bedingungen dabei bleiben (am einfachsten: den Link zum GitHub-Repository teilen).
+
+2. Bearbeiten nur mit Erlaubnis. Verändern, Bearbeiten, Übersetzen oder Weiterentwickeln
+   des Programms oder seines Quelltexts (auch in Teilen) sowie die Weitergabe oder
+   Veröffentlichung veränderter Fassungen ist nur mit vorheriger schriftlicher Erlaubnis
+   des Urhebers gestattet (z. B. per GitHub-Issue anfragen). Verkaufen ist nicht
+   gestattet. Ansehen und Forken auf GitHub im Rahmen der GitHub-Nutzungsbedingungen
+   bleiben davon unberührt.
+
+3. Inoffiziell. Fog Translate ist ein inoffizielles Fan-Tool. Es ist nicht mit Behaviour
+   Interactive (Dead by Daylight), Epic Games (Easy Anti-Cheat), Anthropic, Google,
+   Ollama oder deren Partnern verbunden und wurde von ihnen weder geprüft noch
+   genehmigt. „Dead by Daylight“ und zugehörige Namen sind Marken ihrer jeweiligen
+   Inhaber.
+
+4. Auf eigene Gefahr. Die Nutzung erfolgt auf eigene Gefahr. Fog Translate liest nur
+   Bildschirmpixel und Fensterinformationen, verändert keine Spieldateien, greift nicht
+   auf den Spielprozess zu und sendet keine Eingaben an das Spiel. Trotzdem kann
+   niemand zusagen, wie Behaviour Interactive oder ein Anti-Cheat-System ein externes
+   Programm bewertet. Es gibt keine Zusicherung, dass die Nutzung nicht zu einer
+   Verwarnung, Sperre oder dem Verlust eines Spielkontos führt. Ob du das Programm
+   benutzt, entscheidest du selbst; die Regeln des Spiels einzuhalten, liegt bei dir.
+
+5. Übersetzungsdienste und Daten anderer. Mit Claude (Anthropic) oder Gemini (Google)
+   wird ein Bild des markierten Chat-Bereichs an den jeweiligen Anbieter geschickt –
+   mit deinem eigenen Konto und API-Key. Das Bild kann Namen und Nachrichten anderer
+   Spieler zeigen. Für die Nutzung dieser Dienste, ihre Kosten und die Einhaltung ihrer
+   Bedingungen sowie des Datenschutzes gegenüber Mitspielern bist du verantwortlich.
+   Mit Ollama bleibt das Bild auf deinem Rechner. Übersetzungen können falsch sein.
+
+6. Ohne Gewähr. Das Programm wird so, wie es ist, ohne jede Gewährleistung
+   bereitgestellt – insbesondere ohne Gewähr für Richtigkeit, Verfügbarkeit oder
+   Eignung für einen bestimmten Zweck.
+
+7. Haftung. Soweit gesetzlich zulässig, haftet der Urheber nicht für Schäden aus der
+   Nutzung oder Nichtnutzbarkeit des Programms, insbesondere nicht für Sperren oder den
+   Verlust von Spielkonten, Kosten bei Übersetzungsdiensten, Fortschritt oder Daten.
+   Unberührt bleibt die Haftung für Vorsatz und grobe Fahrlässigkeit sowie für Schäden
+   an Leben, Körper oder Gesundheit.
+
+8. Fremde Bestandteile. Die Bibliotheken, die das Programm nutzt (siehe
+   THIRD_PARTY.md), stehen unter ihren eigenen Lizenzen; diese Bedingungen gelten für
+   sie nicht.
+
+ENGLISH
+
+1. Use and sharing. You may download and use Fog Translate free of charge. You may pass
+   the unmodified program on to others free of charge as long as these terms stay with
+   it (easiest: share the link to the GitHub repository).
+
+2. Modifying only with permission. Modifying, editing, translating or further developing
+   the program or its source code (in whole or in part), and distributing or publishing
+   modified versions, is only permitted with the author's prior written permission
+   (e.g. ask in a GitHub issue). Selling it is not permitted. Viewing and forking on
+   GitHub under GitHub's Terms of Service remain unaffected.
+
+3. Unofficial. Fog Translate is an unofficial fan tool. It is not affiliated with
+   Behaviour Interactive (Dead by Daylight), Epic Games (Easy Anti-Cheat), Anthropic,
+   Google, Ollama or their partners, and it has not been reviewed or approved by them.
+   "Dead by Daylight" and related names are trademarks of their respective owners.
+
+4. At your own risk. You use the program at your own risk. Fog Translate only reads
+   screen pixels and window information, does not modify game files, does not access
+   the game process and sends no input to the game. Still, nobody can promise how
+   Behaviour Interactive or an anti-cheat system judges an external program. There is
+   no assurance that using it will not lead to a warning, a ban or the loss of a game
+   account. Whether you use it is your decision; following the game's rules is your
+   responsibility.
+
+5. Translation services and other people's data. With Claude (Anthropic) or Gemini
+   (Google), a picture of the marked chat area is sent to that provider – with your own
+   account and API key. The picture can show other players' names and messages. You are
+   responsible for using these services, their costs, following their terms, and for
+   data protection towards other players. With Ollama the picture stays on your
+   computer. Translations can be wrong.
+
+6. No warranty. The program is provided "as is", without warranty of any kind,
+   including accuracy, availability or fitness for a particular purpose.
+
+7. Liability. To the extent permitted by law, the author is not liable for any damage
+   arising from the use of or the inability to use the program, in particular not for
+   bans or the loss of game accounts, costs of translation services, progress or data.
+   Liability for intent and gross negligence and for injury to life, body or health
+   remains unaffected.
+
+8. Third-party parts. The libraries the program uses (see THIRD_PARTY.md) are subject
+   to their own licenses; these terms do not apply to them.

@@ -7,6 +7,10 @@ und zeigt neue fremdsprachige Zeilen in einem klickdurchlässigen Fenster über 
 von Fog Scout (`sarujansa/fog-scout`); Code daraus darf kopiert werden (gleicher Autor). Oberfläche **Englisch** (Wunsch des Nutzers, 0.6), Doku Deutsch,
 Code und Kommentare Englisch.
 
+**Lizenz** (Wunsch des Nutzers, 0.7.4): eigene Bedingungen in `LICENSE` – nutzen und unverändert kostenlos
+weitergeben erlaubt, Bearbeiten/veränderte Fassungen nur mit schriftlicher Erlaubnis, kein Verkauf. Neue
+Abhängigkeiten in `THIRD_PARTY.md` eintragen (Wächter `test_every_package_is_listed_in_third_party`).
+
 ## Harte Regeln (nicht verhandelbar)
 
 - **Keine Eingaben ans Spiel** (kein SendInput/PostMessage, keine Tastatur-/Maus-Simulation), nichts in den Chat
