@@ -22,16 +22,24 @@ def test_viewport_of_the_users_ultrawide_has_bars_of_440():
 
 
 def test_region_survives_another_window_size():
-    rel = geometry.to_relative((440 + 64, 1000, 640, 300), geometry.viewport(3440, 1440))
+    rel = geometry.to_relative((860, 1000, 860, 360), geometry.window_space(3440, 1440))
     assert geometry.valid_region(rel)
-    assert geometry.from_relative(rel, geometry.viewport(1920, 1080)) == (48, 750, 480, 225)
+    assert geometry.from_relative(rel, geometry.window_space(1720, 720)) == (430, 500, 430, 180)
 
 
-def test_region_is_clipped_to_the_picture_and_tiny_boxes_are_rejected():
-    view = geometry.viewport(3440, 1440)
-    rel = geometry.to_relative((0, 1000, 800, 300), view)       # starts in the black bar
-    assert rel[0] == 0
-    assert geometry.to_relative((500, 500, 10, 10), view) is None
+def test_the_chat_right_of_the_16_9_picture_is_not_cut_off():
+    """Saru's lobby on 3440 × 1440: the chat sits at x ≈ 2800..3280, right of the 16:9 picture (ends at 3000).
+    Until 0.7 the box was clipped there – every marking ended at x = 3000."""
+    space = geometry.window_space(3440, 1440)
+    rel = geometry.to_relative((2800, 850, 480, 340), space)
+    assert geometry.from_relative(rel, space) == (2800, 850, 480, 340)
+
+
+def test_region_is_clipped_to_the_window_and_tiny_boxes_are_rejected():
+    space = geometry.window_space(3440, 1440)
+    rel = geometry.to_relative((-50, 1000, 800, 300), space)
+    assert rel[0] == 0 and geometry.from_relative(rel, space)[2] == 750
+    assert geometry.to_relative((500, 500, 10, 10), space) is None
 
 
 def test_overlay_goes_above_the_region_or_below_it_when_there_is_no_room():
@@ -256,7 +264,7 @@ def test_a_better_reading_takes_the_place_of_the_fragments_on_screen():
 def test_the_region_follows_the_game_window():
     eng, _ = _engine()
     x, y, w, h = eng.region_on_screen(SimpleNamespace(client=(100, 50, 3440, 1440), minimized=False))
-    assert x == 100 + 440 + round(0.02 * 2560) and y == 50 + round(0.6 * 1440)
+    assert x == 100 + round(0.02 * 3440) and y == 50 + round(0.6 * 1440)
 
 
 # ---------------------------------------------------------------- settings + key
@@ -276,7 +284,7 @@ def test_dpapi_round_trip_with_a_stand_in_cipher():
 
 
 def test_broken_settings_fall_back_to_defaults(tmp_path):
-    (tmp_path / "settings.json").write_text('{"region": [5, 5, 0, 0], "target": "xx", "model": "gpt", '
+    (tmp_path / "settings.json").write_text('{"region": [5, 5, 0, 0], "region_space": "window", "target": "xx", "model": "gpt", '
                                             '"service": "x", "ollama_port": 0, "accepted": ["x", "gemini"]}',
                                             encoding="utf-8")
     s = Settings(str(tmp_path))
@@ -373,3 +381,12 @@ def test_the_instruction_tells_white_and_foreign_names_apart_from_wrapped_lines(
     for words in ("any colour", "any script", "Chinese", "begins with 'Name:' starts a new message",
                   "WITHOUT 'Name:'", "Joined Match"):
         assert words in SYSTEM, words
+
+
+def test_a_region_marked_before_0_7_1_is_dropped_so_it_gets_marked_again(tmp_path):
+    (tmp_path / "settings.json").write_text('{"region": [0.9, 0.6, 0.1, 0.2]}', encoding="utf-8")
+    s = Settings(str(tmp_path))
+    assert s["region"] is None
+    s["region"] = [0.8, 0.6, 0.15, 0.25]
+    s.save()
+    assert Settings(str(tmp_path))["region"] == [0.8, 0.6, 0.15, 0.25]

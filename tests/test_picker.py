@@ -35,11 +35,11 @@ def test_the_box_is_marked_in_picture_pixels_even_when_the_picture_is_shown_smal
     picker = RegionPicker(_picture(), got.append)
     picker.canvas.resize(860, 360)                     # exactly 1/4
     assert not picker.save_btn.isEnabled()
-    _drag(picker.canvas, (125, 250), (275, 325))       # picture 500..1100 × 1000..1300
+    _drag(picker.canvas, (700, 212), (820, 297))       # picture 2800..3280 × 848..1188: right of 16:9
     assert picker.save_btn.isEnabled()
     picker.save()
-    view = geometry.viewport(3440, 1440)
-    assert geometry.from_relative(got[0], view) == (500, 1000, 600, 300)
+    view = geometry.window_space(3440, 1440)
+    assert geometry.from_relative(got[0], view) == (2800, 848, 480, 340)
 
 
 def test_marking_again_replaces_the_old_box_wherever_the_new_one_starts(app):
@@ -121,6 +121,6 @@ def test_the_picker_opens_on_a_picture_of_the_game_window(app, monkeypatch):
     from PySide6.QtCore import QRect
     picker.canvas.box = QRect(500, 1000, 600, 300)
     picker.save()
-    assert geometry.from_relative(win.settings["region"], geometry.viewport(3440, 1440)) == (500, 1000, 600, 300)
+    assert geometry.from_relative(win.settings["region"], geometry.window_space(3440, 1440)) == (500, 1000, 600, 300)
     assert win.picker is None
     win.close()
