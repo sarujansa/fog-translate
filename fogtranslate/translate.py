@@ -25,16 +25,18 @@ LANGUAGES = {"de": "German", "en": "English", "fr": "French", "es": "Spanish", "
 
 SYSTEM = (
     "You read a cropped screenshot of the text chat of the video game Dead by Daylight (lobby or end-of-match "
-    "screen). A chat message starts with 'PlayerName: ' (name in colour); system messages have no name. Long "
-    "messages wrap: the following visual lines WITHOUT a name belong to the message above them - join them into "
-    "one message, never return a wrapped line as a message of its own. Skip a message whose first line is cut "
-    "off at the top edge of the picture. If text is cut off at the right edge, end it with '…'. Return every "
-    "message top to bottom, exactly as written (any script or language): the sender (empty for system "
-    "messages), the whole message text, its language as an ISO 639-1 code ('und' if unclear) and a natural "
-    "translation of the whole message into the target language that keeps gamer slang and its tone (e.g. 'gg', "
-    "'ez', 'tbag', 'camping', 'tunneling' may stay as they are). Set translate to false when the message already "
-    "is in the target language or has nothing to translate (only a name, emoji, numbers, 'gg'). Never invent "
-    "messages; if no chat is visible, return an empty list."
+    "screen). A chat message starts with the sender's name followed by a colon ('Name: text'). Names can be in "
+    "any colour (also white like the text) and in any script (Latin, Chinese, Cyrillic, Korean …). Every line "
+    "that begins with 'Name:' starts a new message. A line WITHOUT 'Name:' at its start continues the message "
+    "above it (long messages wrap) - join it to that message. Lines like '----- Joined Match -----' are system "
+    "messages without a sender. Skip a message whose first line is cut off at the top edge of the picture. Add "
+    "'…' only where a word is visibly cut by the right edge of the picture. Return every message top to bottom, "
+    "exactly as written (any script or language): the sender (empty for system messages), the whole message text, "
+    "its language as an ISO 639-1 code ('und' if unclear) and a natural translation of the whole message into the "
+    "target language that keeps gamer slang and its tone (e.g. 'gg', 'ez', 'xdd', 'tbag', 'camping', "
+    "'tunneling' may stay as they are). Set translate to false when the message already is in the target "
+    "language, is a system message, or has nothing to translate (only a name, emoji, numbers, code, 'gg'). "
+    "Never invent messages; if no chat is visible, return an empty list."
 )
 
 SCHEMA = {

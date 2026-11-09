@@ -10,23 +10,30 @@ from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
-from . import geometry
+from . import geometry, qtgeom
+
+
+def _span(a: QPoint, b: QPoint) -> QRect:
+    """The box between two points; width = |dx| (QRect(a, b) would count both end points, one pixel more)."""
+    return QRect(min(a.x(), b.x()), min(a.y(), b.y()), abs(a.x() - b.x()), abs(a.y() - b.y()))
 
 
 class RegionPicker(QWidget):
-    def __init__(self, client, done, current=None):
-        """``client`` = (x, y, w, h) of the game picture on screen; ``done(rel_or_None)``."""
+    def __init__(self, client, done, current=None, scale: float | None = None):
+        """``client`` = (x, y, w, h) of the game picture on screen in physical pixels; ``done(rel_or_None)``.
+        The window itself works in Qt coordinates (physical / ``scale``)."""
         super().__init__(None, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
                          | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.client = tuple(client)
+        self.scale = scale or qtgeom.ratio()
         self.view = geometry.viewport(self.client[2], self.client[3])
         self._done = done
         self._start: QPoint | None = None
         self._box: QRect | None = None
         if current is not None:
-            self._box = QRect(*geometry.from_relative(current, self.view))
-        self.setGeometry(*self.client)
+            self._box = QRect(*qtgeom.to_qt(geometry.from_relative(current, self.view), self.scale))
+        self.setGeometry(*qtgeom.to_qt(self.client, self.scale))
         self.setCursor(Qt.CursorShape.CrossCursor)
 
     DIM = QColor(0, 0, 0, 120)
@@ -52,21 +59,24 @@ class RegionPicker(QWidget):
     def mousePressEvent(self, e):
         if e.button() == Qt.MouseButton.LeftButton:
             self._start = e.position().toPoint()
-            self._box = QRect(self._start, self._start)
+            self._box = _span(self._start, self._start)
             self.update()
         elif e.button() == Qt.MouseButton.RightButton:
             self._finish(None)
 
     def mouseMoveEvent(self, e):
         if self._start is not None:
-            self._box = QRect(self._start, e.position().toPoint()).normalized()
+            self._box = _span(self._start, e.position().toPoint())
             self.update()
 
     def mouseReleaseEvent(self, e):
         if e.button() == Qt.MouseButton.LeftButton and self._box is not None:
+            if self._start is not None:
+                self._box = _span(self._start, e.position().toPoint())
             b = self._box.normalized()
             self._start = None
-            rel = geometry.to_relative((b.x(), b.y(), b.width(), b.height()), self.view)
+            physical = qtgeom.from_qt((b.x(), b.y(), b.width(), b.height()), self.scale)
+            rel = geometry.to_relative(physical, self.view)
             if rel is not None:
                 self._finish(rel)
             else:

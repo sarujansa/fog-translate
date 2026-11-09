@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QPushButton, QTextBrowser, QVBoxLayout, QWidget)
 
-from . import __version__, geometry, ollama, services, translate, window
+from . import __version__, geometry, ollama, qtgeom, services, translate, window
 from .config import Settings
 from .engine import Engine
 from .looper import Looper
@@ -354,7 +354,7 @@ class MainWindow(QWidget):
             client = game.client
         else:                                          # no DBD: mark on the primary screen (for testing)
             g = QApplication.primaryScreen().geometry()
-            client = (g.x(), g.y(), g.width(), g.height())
+            client = qtgeom.from_qt((g.x(), g.y(), g.width(), g.height()), qtgeom.ratio())
         self.overlay.hide()
         self.picker = RegionPicker(client, self._picked, self.settings["region"])
         self.picker.start()
@@ -375,7 +375,9 @@ class MainWindow(QWidget):
         self.engine.worker = NoWorker()
         self.engine.status, self.engine.error = "starting", ""
         settings = self.settings
-        log.info("Start: Dienst %s", settings["service"])
+        game = window.find_game()
+        log.info("Start: service %s, scale %.2f, game window %s, chat area %s", settings["service"], qtgeom.ratio(),
+                 game.client if game else None, self.engine.region_on_screen(game))
         overlay = self.overlay
         self.looper = Looper(self.engine, lambda: services.make(settings), self.results.put, settings["look_s"],
                              own_rects=lambda: [r for r in (overlay.rect_on_screen,) if r])
@@ -437,8 +439,8 @@ class MainWindow(QWidget):
             return
         screen = QApplication.screenAt(self.overlay.geometry().center()) or QApplication.primaryScreen()
         g = screen.geometry()
-        self.overlay.show_lines(lines, lambda size: geometry.overlay_spot(box, size,
-                                                                          (g.x(), g.y(), g.width(), g.height())))
+        area = qtgeom.from_qt((g.x(), g.y(), g.width(), g.height()), qtgeom.ratio())
+        self.overlay.show_lines(lines, lambda size: geometry.overlay_spot(box, size, area))
 
     def _refresh(self):
         e = self.engine

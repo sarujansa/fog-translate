@@ -40,8 +40,10 @@ Code und Kommentare Englisch.
 ## Setup des Nutzers
 
 Samsung G5 3440×1440, DBD (Steam/Epic/MS Store) im Fenster-Vollbild, rendert 16:9 = 2560×1440 zentriert (Balken je
-440 px). Bereiche daher relativ zum 16:9-Viewport (`geometry.viewport`). Qt läuft mit
-`QT_ENABLE_HIGHDPI_SCALING=0`, damit Qt-, Win32- und mss-Koordinaten gleich (physische Pixel) sind.
+440 px). Bereiche daher relativ zum 16:9-Viewport (`geometry.viewport`). Win32 und mss rechnen in
+physischen Pixeln, Qt bei Windows-Skalierung > 100 % in logischen (physisch / Faktor): **jede** Stelle, an der ein
+Bildschirm-Rechteck ein Qt-Fenster trifft, rechnet über `qtgeom` (`ratio`, `to_qt`, `from_qt`) – Markieren, Overlay,
+Bildschirmfläche (Sarus Test 09.11.2026: abgeschnittene Zeilen). `QT_ENABLE_HIGHDPI_SCALING=0` bleibt zusätzlich.
 
 ## Architektur (fogtranslate/)
 
@@ -56,6 +58,7 @@ Samsung G5 3440×1440, DBD (Steam/Epic/MS Store) im Fenster-Vollbild, rendert 16
 | `window.py`, `grab.py` | DBD-Fenster (nur Fensterinfos; Titel mit festem Puffer, keine Längenabfrage, die eine Nachricht schicken könnte), mss-Ausschnitt |
 | `secret.py`, `config.py` | DPAPI, `Settings` in `%LOCALAPPDATA%\FogTranslate` (`FOGTRANSLATE_DATA_DIR` in Tests; Keys je Dienst `api_key(service)`, `accepted(service)`, übernimmt 0.1-Schlüssel) |
 | `update.py`, `deps.py` | Update auf Klick (`check` → `Check.state` current/behind/ahead/dirty/branch/newer/error, `apply` = `merge --ff-only`, `restart`), Pakete nach Update (`needed`, `main`, nur Standardbibliothek) |
+| `qtgeom.py` | Physische ↔ Qt-Pixel (`ratio` = devicePixelRatio des Hauptbildschirms) |
 | `icon.py` | Logo per QPainter (zwei Sprechblasen + Nebel, `paint`/`pixmap`/`icon`, `SIZES`), `set_app_id` (eigenes Taskleisten-Symbol); `assets/logo.png` erzeugt `tools/export_logo.py` – nach Änderungen an der Zeichnung neu erzeugen |
 | `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig, von Aufnahmen ausgenommen; je Nachricht Kopfzeile Sprache + Name, Übersetzung, Original klein; Messen und Zeichnen über dieselben `rows`/`_height`), Verlauf `history_html` (alles escaped), Bereich markieren, Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads), Start/`--test`; `__main__._log_setup`: Log, unbehandelte Fehler aller Threads ins Log, `faulthandler` → `crash.txt` |
 

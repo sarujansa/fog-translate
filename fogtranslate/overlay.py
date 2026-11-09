@@ -12,6 +12,7 @@ from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PySide6.QtWidgets import QWidget
 
+from . import qtgeom
 from .lines import ChatLine
 
 PAD = 10
@@ -84,16 +85,19 @@ class TranslationOverlay(QWidget):
         return w + 2 * PAD, h + PAD - ROW_GAP
 
     def show_lines(self, lines, spot_for_size):
-        """``spot_for_size((w, h)) → (x, y)``; hidden when there is nothing to show."""
+        """``spot_for_size((w, h)) → (x, y)`` in physical screen pixels; hidden when there is nothing to show."""
         self.lines = list(lines)
         if not self.lines:
             self.rect_on_screen = None
             self.hide()
             return
-        w, h = self.layout_size(self.lines)
-        x, y = spot_for_size((w, h))
-        self.setGeometry(x, y, w, h)
-        self.rect_on_screen = (x, y, w, h)
+        r = qtgeom.ratio()
+        w, h = self.layout_size(self.lines)                     # Qt pixels
+        pw, ph = qtgeom.from_qt((w, h), r)
+        x, y = spot_for_size((pw, ph))
+        qx, qy = qtgeom.to_qt((x, y), r)
+        self.setGeometry(qx, qy, w, h)
+        self.rect_on_screen = (x, y, pw, ph)                    # physical, for blacking it out
         if not self.isVisible():
             self.show()
         if self._affinity is not self.hide_in_captures:

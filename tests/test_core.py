@@ -366,3 +366,10 @@ def test_a_screen_grabber_that_cannot_start_is_reported():
     loop.join(2)
     kinds = [q.get(timeout=1)[0], q.get(timeout=1)[0]]
     assert kinds == ["started", "start_failed"] and not loop.is_alive()
+
+
+def test_the_instruction_tells_white_and_foreign_names_apart_from_wrapped_lines():
+    from fogtranslate.translate import SYSTEM
+    for words in ("any colour", "any script", "Chinese", "begins with 'Name:' starts a new message",
+                  "WITHOUT 'Name:'", "Joined Match"):
+        assert words in SYSTEM, words
