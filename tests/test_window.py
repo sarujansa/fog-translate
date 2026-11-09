@@ -72,3 +72,14 @@ def test_the_last_sent_picture_can_be_shown(app):
     assert win._picture_view.pixmap().width() == 120
     win._picture_view.close()
     win.close()
+
+
+def test_the_logo_is_drawn_at_every_size(app):
+    from fogtranslate import icon
+    ic = icon.icon()
+    for n in icon.SIZES:
+        pm = icon.pixmap(n)
+        assert pm.width() == n and not pm.toImage().isNull()
+        corner, middle = pm.toImage().pixelColor(0, 0), pm.toImage().pixelColor(n // 2, n // 2)
+        assert corner.alpha() == 0 and middle.alpha() == 255      # rounded tile, opaque inside
+    assert len(ic.availableSizes()) == len(icon.SIZES)

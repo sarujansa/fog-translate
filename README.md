@@ -1,3 +1,5 @@
+<img src="assets/logo.png" alt="" width="96" align="right">
+
 # Fog Translate
 
 Live-Übersetzung des **Dead by Daylight**-Chats. Du markierst einmal den Chat-Bereich; sobald dort neue Zeilen

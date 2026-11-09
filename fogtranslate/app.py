@@ -387,7 +387,10 @@ def run(argv=None) -> int:
     import os
     # Qt coordinates = physical pixels, like the Win32 window rectangles and mss
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "0")
+    from . import icon
+    icon.set_app_id()
     app = QApplication.instance() or QApplication(argv or sys.argv)
+    app.setWindowIcon(icon.icon())
     settings = Settings()
     win = MainWindow(settings)
     win.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
