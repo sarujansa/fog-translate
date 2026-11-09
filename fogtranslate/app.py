@@ -8,7 +8,7 @@ from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QPushButton, QVBoxLayout, QWidget)
+                               QPushButton, QTextBrowser, QVBoxLayout, QWidget)
 
 from . import __version__, geometry, ollama, services, translate, window
 from .config import Settings
@@ -143,7 +143,9 @@ class MainWindow(QWidget):
         self.accept.toggled.connect(self._settings_changed)
         root.addWidget(self.accept)
 
-        self.history = QListWidget()
+        self.history = QTextBrowser()
+        self.history.setOpenLinks(False)
+        self.history.setPlaceholderText("Übersetzte Nachrichten erscheinen hier.")
         root.addWidget(self.history, 1)
         bottom = QHBoxLayout()
         self.costs = QLabel()
@@ -212,7 +214,9 @@ class MainWindow(QWidget):
         model = self._model_text()
         if services.valid_model(service, model):
             s[services.MODEL_SETTING[service]] = model
-        s["show_all"] = self.show_all.isChecked()
+        if s["show_all"] != self.show_all.isChecked():
+            s["show_all"] = self.show_all.isChecked()
+            self._render_history()
         if services.is_cloud(service):
             s.set_accepted(service, self.accept.isChecked())
         s.save()
@@ -265,6 +269,13 @@ class MainWindow(QWidget):
         view.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self._picture_view = view
         view.show()
+
+    def _render_history(self):
+        bar = self.history.verticalScrollBar()
+        at_end = bar.value() >= bar.maximum() - 4
+        self.history.setHtml(history_html(self.engine.messages()[-100:]))
+        if at_end:
+            bar.setValue(bar.maximum())
 
     # ---------------------------------------------------------------- updates (only on click)
     UPDATE_TEXT = {
@@ -341,7 +352,7 @@ class MainWindow(QWidget):
             self.settings["region"] = list(rel)
             self.settings.save()
             self.engine.gate.reset()
-            self.engine.seen.clear()
+            self.engine.transcript.clear()
         self._refresh()
 
     # ---------------------------------------------------------------- loop
@@ -396,14 +407,9 @@ class MainWindow(QWidget):
                 self._stop_looper()
                 self.engine.status, self.engine.error = "error", value.kind
             elif kind == "answer":
-                new = self.engine.answer(value)
+                if self.engine.answer(value):
+                    self._render_history()
                 self.settings.save()
-                for ln in new:
-                    self.history.addItem(_history_text(ln))
-                while self.history.count() > 200:
-                    self.history.takeItem(0)
-                if new:
-                    self.history.scrollToBottom()
         if self.running:
             self._refresh_overlay()
         self._refresh()
@@ -440,11 +446,21 @@ class MainWindow(QWidget):
         super().closeEvent(event)
 
 
-def _history_text(ln) -> str:
-    head = (ln.sender + ": ") if ln.sender else ""
-    if ln.translate and ln.translation != ln.text:
-        return "[%s] %s%s   ←  %s" % (ln.language.upper(), head, ln.translation, ln.text)
-    return head + ln.text
+def history_html(lines) -> str:
+    """The message list as HTML – every text from the service escaped, so it can only ever be plain text."""
+    from html import escape
+    parts = []
+    for ln in lines:
+        head = escape(ln.sender) if ln.sender else "System"
+        tag = ('<span style="color:#ffc45c; font-weight:600">%s</span>&nbsp;&nbsp;' % escape(ln.language.upper())
+               if ln.translate else "")
+        body = escape(ln.translation if ln.translate else ln.text)
+        block = ('<div style="margin:0 0 10px 0">%s<span style="color:#8a93a3; font-weight:600">%s</span><br>'
+                 '<span style="font-size:15px">%s</span>' % (tag, head, body))
+        if ln.translate and ln.translation != ln.text:
+            block += '<br><span style="color:#8a8f99; font-size:12px">%s</span>' % escape(ln.text)
+        parts.append(block + "</div>")
+    return "".join(parts)
 
 
 def run(argv=None) -> int:

@@ -12,7 +12,7 @@ from datetime import datetime
 
 from . import geometry
 from .change import ChangeGate
-from .lines import ChatLine, SeenLines
+from .lines import ChatLine, Transcript
 from .translate import Result, TranslateError
 
 KEEP_SHOWN = 8
@@ -38,8 +38,8 @@ class Engine:
         self.clock = clock
         self.now = now
         self.gate = ChangeGate()
-        self.seen = SeenLines()
-        self.shown: list[tuple[float, ChatLine]] = []
+        self.transcript = Transcript()
+        self.shown: dict[str, float] = {}      # key of a message on screen → when it (last) changed
         self.status = "idle"         # idle | no_region | no_game | background | watching | asking | cap | error
         self.error = ""
         self._last_request = -1e9
@@ -99,30 +99,40 @@ class Engine:
             self.status = "asking"
 
     @_locked
-    def answer(self, outcome) -> list[ChatLine]:
-        """A finished request (in the Qt thread). Returns the newly shown lines."""
+    def answer(self, outcome) -> bool:
+        """A finished request (in the Qt thread). True when the transcript changed."""
         n = self.now()
         if isinstance(outcome, TranslateError):
             self.status = "error"
             self.error = outcome.kind
             if outcome.kind == "quota":
                 self._not_before = self.clock() + QUOTA_WAIT_S
-            return []
+            return False
         assert isinstance(outcome, Result)
         self.settings.count_request(n.strftime("%Y-%m-%d"), n.strftime("%Y-%m"), outcome.cost_usd)
         self.status = "watching"
         self.error = ""
-        new = self.seen.new(outcome.lines)
-        if not self.settings["show_all"]:
-            new = [ln for ln in new if ln.translate]
+        added, replaced = self.transcript.add(outcome.lines)
         t = self.clock()
-        self.shown.extend((t, ln) for ln in new)
-        self.shown = self.shown[-KEEP_SHOWN:]
-        return new
+        for old_key, line in replaced.items():
+            self.shown.pop(old_key, None)
+            self.shown[line.key()] = t
+        for line in added:
+            self.shown[line.key()] = t
+        return bool(added or replaced)
+
+    def wanted(self, line: ChatLine) -> bool:
+        return line.translate or bool(self.settings["show_all"])
+
+    @_locked
+    def messages(self) -> list[ChatLine]:
+        """The transcript as the window lists it."""
+        return [ln for ln in self.transcript.entries if self.wanted(ln)]
 
     @_locked
     def visible(self) -> list[ChatLine]:
-        """Lines still on screen (newer than ``show_s``)."""
+        """Messages for the overlay: the newest ones that changed within ``show_s``."""
         limit = self.clock() - float(self.settings["show_s"])
-        self.shown = [(t, ln) for t, ln in self.shown if t >= limit]
-        return [ln for _, ln in self.shown]
+        self.shown = {k: t for k, t in self.shown.items() if t >= limit}
+        out = [ln for ln in self.transcript.entries if ln.key() in self.shown and self.wanted(ln)]
+        return out[-KEEP_SHOWN:]

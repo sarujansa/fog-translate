@@ -9,7 +9,7 @@ from fogtranslate import geometry, secret
 from fogtranslate.change import ChangeGate
 from fogtranslate.config import Settings
 from fogtranslate.engine import Engine
-from fogtranslate.lines import ChatLine, SeenLines
+from fogtranslate.lines import ChatLine, Transcript, same_message
 from fogtranslate.claude import Translator
 from fogtranslate.translate import SCHEMA, Result, TranslateError, parse
 
@@ -70,11 +70,35 @@ def _line(sender, text, translate=True, translation="x"):
 
 
 def test_lines_already_shown_are_not_shown_again_even_if_read_slightly_differently():
-    seen = SeenLines()
-    first = seen.new([_line("Meg", "привет всем!"), _line("Dwight", "gg", translate=False)])
-    assert len(first) == 2
-    again = seen.new([_line("meg", "Привет всем"), _line("Claudette", "камп")])
-    assert [ln.sender for ln in again] == ["Claudette"]
+    t = Transcript()
+    added, _ = t.add([_line("Meg", "привет всем!"), _line("Dwight", "gg", translate=False)])
+    assert len(added) == 2
+    added, replaced = t.add([_line("meg", "Привет всем"), _line("Claudette", "камп")])
+    assert [ln.sender for ln in added] == ["Claudette"] and not replaced
+
+
+# Saru's test (09.11.2026): one Russian message, wrapped over four chat lines, was read as fragments first and
+# as a whole later – it must end up as ONE message, not five.
+FULL = ("Сегодня вечером в Санкт-Галлене холодно и тихо. Я сижу дома, пью чай и читаю книгу. Завтра мне рано "
+        "вставать, потому что утром у меня много работы.")
+
+
+def test_fragments_of_a_wrapped_message_are_merged_into_the_whole_reading():
+    t = Transcript()
+    t.add([_line("Dwight Fairfield", "Санкт-Галлене х…"), _line("", "сижу дома, пью"),
+           _line("", "Завтра мне рано"), _line("", "что утром у меня")])
+    assert len(t.entries) == 4
+    added, replaced = t.add([_line("Dwight Fairfield", FULL, translation="Heute Abend …")])
+    assert not added and len(replaced) == 4
+    assert len(t.entries) == 1 and t.entries[0].text == FULL and t.entries[0].sender == "Dwight Fairfield"
+    added, replaced = t.add([_line("Dwight Fairfield", FULL[:60] + "…")])       # a worse reading later
+    assert not added and not replaced and t.entries[0].text == FULL
+
+
+def test_different_messages_stay_apart():
+    assert not same_message(_line("Meg", "go gens"), _line("Meg", "gg"))
+    assert not same_message(_line("Meg", "hello there friend"), _line("Ace", "hello there friend"))
+    assert same_message(_line("Meg", "ich bin am generator"), _line("Meg", "ich bin am generatur"))
 
 
 # ---------------------------------------------------------------- answer parsing
@@ -191,11 +215,21 @@ def test_requests_keep_the_minimum_gap_and_the_daily_cap():
 
 def test_only_new_foreign_lines_are_shown_and_they_fade():
     eng, t = _engine(show_s=25.0)
-    new = eng.answer(Result([_line("Meg", "привет"), _line("Me", "hallo", translate=False)], 0.0))
-    assert [ln.sender for ln in new] == ["Meg"]
-    assert eng.answer(Result([_line("Meg", "привет")], 0.0)) == []
+    assert eng.answer(Result([_line("Meg", "привет"), _line("Me", "hallo", translate=False)], 0.0))
+    assert [ln.sender for ln in eng.visible()] == ["Meg"]
+    assert [ln.sender for ln in eng.messages()] == ["Meg"]
+    assert eng.answer(Result([_line("Meg", "привет")], 0.0)) is False
     t[0] = 30.0
     assert eng.visible() == []
+    assert len(eng.messages()) == 1                  # the list keeps it
+
+
+def test_a_better_reading_takes_the_place_of_the_fragments_on_screen():
+    eng, t = _engine(show_s=25.0)
+    eng.answer(Result([_line("Dwight", "Санкт-Галлене х…"), _line("", "сижу дома, пью")], 0.0))
+    t[0] = 5.0
+    eng.answer(Result([_line("Dwight", FULL)], 0.0))
+    assert [ln.text for ln in eng.visible()] == [FULL]
 
 
 def test_the_region_follows_the_game_window():
