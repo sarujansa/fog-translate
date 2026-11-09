@@ -1,4 +1,4 @@
-"""``python -m fogtranslate`` – start the program. ``--test BILD.png`` translates one screenshot crop once."""
+"""``python -m fogtranslate`` – start the program. ``--test PICTURE.png`` translates one screenshot crop once."""
 from __future__ import annotations
 
 import argparse
@@ -38,8 +38,8 @@ def _log_setup():
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="fogtranslate")
-    ap.add_argument("--test", metavar="BILD", help="ein Bild (Chat-Ausschnitt) einmal übersetzen")
-    ap.add_argument("--service", choices=("claude", "gemini", "ollama"), help="Dienst für --test")
+    ap.add_argument("--test", metavar="PICTURE", help="translate one picture (chat crop) once")
+    ap.add_argument("--service", choices=("claude", "gemini", "ollama"), help="service for --test")
     args = ap.parse_args(argv)
     _log_setup()
     if args.test:
@@ -55,12 +55,12 @@ def main(argv=None) -> int:
         try:
             res = services.make(s).request(img)
         except TranslateError as e:
-            print("Fehler:", e.kind)
+            print("Error:", e.kind)
             return 1
         for ln in res.lines:
             print(("✓ " if not ln.translate else "→ ") + "[%s] %s: %s  |  %s"
                   % (ln.language, ln.sender, ln.text, ln.translation))
-        print("Kosten ca. %.4f $" % res.cost_usd)
+        print("Cost about $%.4f" % res.cost_usd)
         return 0
     from .app import run
     return run()

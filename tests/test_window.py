@@ -39,12 +39,12 @@ def test_starting_without_key_or_notice_is_refused(app):
     win = MainWindow(Settings())
     _pick(win, "gemini")
     win.toggle()
-    assert not win.running and "Hinweis" in win.status.text()
+    assert not win.running and "notice" in win.status.text()
     win.accept.setChecked(True)
     win.toggle()                                      # starts at once; the missing key comes from the thread
-    assert win.running and "Startet" in win.status.text()
+    assert win.running and "Starting" in win.status.text()
     _wait(win, lambda: not win.running)
-    assert "API-Key" in win.status.text()
+    assert "API key" in win.status.text()
     _pick(win, "ollama")
     win.toggle()                                      # Ollama needs neither
     assert win.running
@@ -66,7 +66,7 @@ def test_the_last_sent_picture_can_be_shown(app):
     import numpy as np
     win = MainWindow(Settings())
     win.show_last_picture()
-    assert "Noch nichts" in win.status.text()
+    assert "Nothing sent" in win.status.text()
     win.engine.last_sent = np.zeros((40, 120, 3), np.uint8)
     win.show_last_picture()
     assert win._picture_view.pixmap().width() == 120
@@ -89,11 +89,11 @@ def test_the_update_button_follows_the_check(app):
     from fogtranslate.update import Check
     win = MainWindow(Settings())
     win._update_checked(Check("behind", 2))
-    assert win.update_btn.text() == "Aktualisieren und neu starten" and "2 Änderungen" in win.status.text()
+    assert win.update_btn.text() == "Update and restart" and "2 changes" in win.status.text()
     win._update_checked(Check("newer", remote_version="9.9"))
-    assert win.update_btn.text() == "Download-Seite öffnen"
+    assert win.update_btn.text() == "Open download page"
     win._update_checked(Check("dirty"))
-    assert win.update_btn.text() == "Nach Updates suchen" and "geändert" in win.status.text()
+    assert win.update_btn.text() == "Check for updates" and "changed" in win.status.text()
     win.close()
 
 

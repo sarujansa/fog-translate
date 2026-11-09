@@ -23,3 +23,17 @@ class Grabber:
             self._sct.close()
         except Exception:
             pass
+
+
+def blank(img, box, rects):
+    """Black out every part of ``rects`` (screen coordinates) inside the picture of ``box`` – our own windows,
+    so the program never reads (and never sends) its own translations."""
+    if img is None or not rects:
+        return img
+    bx, by, bw, bh = box
+    for rx, ry, rw, rh in rects:
+        x0, y0 = max(rx, bx) - bx, max(ry, by) - by
+        x1, y1 = min(rx + rw, bx + bw) - bx, min(ry + rh, by + bh) - by
+        if x1 > x0 and y1 > y0:
+            img[y0:y1, x0:x1] = 0
+    return img

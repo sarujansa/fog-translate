@@ -29,6 +29,8 @@ DEFAULTS = {
     "daily_cap": 300,                # requests per day at most
     "show_s": 25.0,                  # how long new translations stay on screen
     "show_all": False,               # also show lines already in the target language
+    "hide_in_captures": False,       # True: the overlay is left out of screenshots/recordings (Windows)
+    "read_background": True,         # also read with DBD behind another window – only if nothing covers the chat
     "font_px": 18,
     "spent": {},                     # "YYYY-MM" → estimated USD
     "requests": {},                  # "YYYY-MM-DD" → count

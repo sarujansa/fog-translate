@@ -40,7 +40,7 @@ class Engine:
         self.gate = ChangeGate()
         self.transcript = Transcript()
         self.shown: dict[str, float] = {}      # key of a message on screen → when it (last) changed
-        self.status = "idle"         # idle | no_region | no_game | background | watching | asking | cap | error
+        self.status = "idle"         # idle | no_region | no_game | background | covered | watching | asking | cap | error
         self.error = ""
         self._last_request = -1e9
         self._not_before = -1e9      # after a limit answer
@@ -57,8 +57,10 @@ class Engine:
         return cx + x, cy + y, w, h
 
     @_locked
-    def look(self, game, in_front: bool, grab) -> None:
-        """One tick. ``grab(box)`` returns the BGR picture of a screen box."""
+    def look(self, game, in_front: bool, grab, region_free=None) -> None:
+        """One tick. ``grab(box)`` returns the BGR picture of a screen box. With DBD behind another window the
+        region is read only when ``read_background`` is on and ``region_free(game, box)`` says nothing lies over
+        it – otherwise the picture could be another program's window, and that must never be sent."""
         if self.settings["region"] is None:
             self.status = "no_region"
             return
@@ -66,14 +68,18 @@ class Engine:
             self.status = "no_game"
             self.gate.reset()
             return
-        if not in_front:
-            self.status = "background"
-            return
         box = self.region_on_screen(game)
+        if not in_front:
+            if not self.settings["read_background"]:
+                self.status = "background"
+                return
+            if region_free is None or not region_free(game, box):
+                self.status = "covered"
+                return
         img = grab(box)
         if img is None:
             return
-        if self.status in ("idle", "no_game", "background", "no_region"):
+        if self.status in ("idle", "no_game", "background", "covered", "no_region"):
             self.status = "watching"
         if not self.gate.look(img):
             if self._pending is not None:

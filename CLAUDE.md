@@ -4,7 +4,7 @@ Live-Übersetzung des Dead-by-Daylight-Chats (Windows). Der Nutzer markiert den 
 Zeilen schickt das Programm das Bild des Bereichs an den gewählten Dienst – Claude, Gemini oder lokal Ollama (liest +
 erkennt Sprache + übersetzt in einem Schritt)
 und zeigt neue fremdsprachige Zeilen in einem klickdurchlässigen Fenster über dem Chat. Eigenständig, unabhängig
-von Fog Scout (`sarujansa/fog-scout`); Code daraus darf kopiert werden (gleicher Autor). Oberfläche/Doku Deutsch,
+von Fog Scout (`sarujansa/fog-scout`); Code daraus darf kopiert werden (gleicher Autor). Oberfläche **Englisch** (Wunsch des Nutzers, 0.6), Doku Deutsch,
 Code und Kommentare Englisch.
 
 ## Harte Regeln (nicht verhandelbar)
@@ -13,8 +13,14 @@ Code und Kommentare Englisch.
   schreiben.
 - **Kein Zugriff auf den Spielprozess** (kein OpenProcess, kein Speicherlesen, keine PID-Abfragen) und keine
   Spieldateien. Erlaubt: Bildschirmpixel (mss), Fensterinfos (Klasse `UnrealWindow`, Titel, Position,
-  Vordergrund), `SetWindowDisplayAffinity` nur auf eigenen Fenstern. Nie `PrintWindow`.
-- Gelesen wird nur der markierte Bereich und nur, solange DBD das aktive Fenster ist.
+  Vordergrund, Z-Reihenfolge/Stil/Lage der Fenster darüber), `SetWindowDisplayAffinity` nur auf eigenen Fenstern. Nie `PrintWindow`.
+- Gelesen wird nur der markierte Bereich. Mit DBD im Vordergrund immer; mit DBD im Hintergrund nur bei
+  `read_background` (Standard an, Wunsch des Nutzers) **und** wenn kein anderes Fenster über dem Bereich liegt
+  (`window.region_free` → `windows_above`/`overlaps`, nur Fensterinfos) – sonst würde das Bild eines anderen
+  Programms verschickt. Ohne Prüfung gilt der Bereich als verdeckt (`engine.look`).
+- Das Übersetzungsfenster ist in Screenshots/Aufnahmen sichtbar (Wunsch des Nutzers); das Programm liest es nie
+  mit: der Blick-Thread schwärzt `overlay.rect_on_screen` im Ausschnitt (`grab.blank`). Ausblenden nur mit
+  `hide_in_captures` (`SetWindowDisplayAffinity` nur auf dem eigenen Fenster).
 - **Netz nur zum gewählten Übersetzungsdienst** (`claude.py` → api.anthropic.com über das SDK, `gemini.py` →
   `gemini.HOST`, Key nur im Header `x-goog-api-key`, nie in der URL; `ollama.py` → nur `127.0.0.1`, `HOST` fest,
   nur der Port einstellbar); HTTP nur über `http.py` (keine Weiterleitungen, Antwort ≤ `MAX_BYTES`). Gesendet nur

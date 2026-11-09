@@ -20,35 +20,36 @@ from .picker import RegionPicker
 log = logging.getLogger(__name__)
 
 STATUS = {
-    "idle": "Gestoppt.",
-    "no_region": "Noch kein Chat-Bereich markiert.",
-    "no_game": "Dead by Daylight nicht gefunden – wartet.",
-    "background": "DBD ist nicht im Vordergrund – pausiert.",
-    "starting": "Startet …",
-    "watching": "Beobachtet den Chat …",
-    "asking": "Frage Claude …",
-    "cap": "Tageslimit an Anfragen erreicht – pausiert bis morgen.",
-    "error": "Fehler",
+    "idle": "Stopped.",
+    "no_region": "No chat area marked yet.",
+    "no_game": "Dead by Daylight not found – waiting.",
+    "background": "DBD is not in the foreground – paused.",
+    "covered": "A window covers the chat – paused until it is visible again.",
+    "starting": "Starting …",
+    "watching": "Watching the chat …",
+    "asking": "Translating …",
+    "cap": "Daily request limit reached – paused until tomorrow.",
+    "error": "Error",
 }
 ERRORS = {
-    "key": "API-Key fehlt oder ist ungültig.",
-    "quota": "Limit, Kontingent oder Guthaben beim Dienst erreicht.",
-    "net": "Keine Verbindung zum Dienst.",
-    "refused": "Der Dienst hat diese Anfrage abgelehnt.",
-    "answer": "Antwort des Dienstes nicht lesbar.",
-    "model": "Modell nicht gefunden – Namen prüfen (bei Ollama: „ollama pull <Modell>“).",
-    "server": "Ollama läuft nicht (oder ein anderer Port ist eingestellt).",
-    "other": "Unerwarteter Fehler (siehe Log).",
+    "key": "API key missing or invalid.",
+    "quota": "Rate limit, quota or credit of the service reached.",
+    "net": "No connection to the service.",
+    "refused": "The service declined this request.",
+    "answer": "Could not read the service's answer.",
+    "model": "Model not found – check the name (Ollama: \"ollama pull <model>\").",
+    "server": "Ollama is not running (or a different port is set).",
+    "other": "Unexpected error (see log).",
 }
 NOTICES = {
-    "claude": ("Das Bild des markierten Bereichs (kann Spielernamen und Nachrichten anderer Spieler zeigen) wird "
-               "zum Übersetzen an Anthropic geschickt – mit deinem eigenen API-Key, auf deine Kosten."),
-    "gemini": ("Das Bild des markierten Bereichs (kann Spielernamen und Nachrichten anderer Spieler zeigen) wird "
-               "zum Übersetzen an Google geschickt. In der kostenlosen Stufe darf Google die Daten zur "
-               "Verbesserung seiner Produkte nutzen und Menschen können sie lesen."),
-    "ollama": ("Ollama läuft auf deinem PC – das Bild verlässt den Rechner nicht. Ollama installieren "
-               "(ollama.com) und ein Bildmodell laden, z. B. „ollama pull qwen2.5vl:7b“ (ca. 6 GB, braucht eine "
-               "Grafikkarte mit ≥ 8 GB) oder „gemma3:4b“ für schwächere Karten."),
+    "claude": ("The picture of the marked area (it can show player names and other players' messages) is sent to "
+               "Anthropic for translation – with your own API key, at your own cost."),
+    "gemini": ("The picture of the marked area (it can show player names and other players' messages) is sent to "
+               "Google for translation. On the free tier Google may use the data to improve its products, and "
+               "humans may read it."),
+    "ollama": ("Ollama runs on your PC – the picture never leaves it. Install Ollama (ollama.com) and pull a vision "
+               "model, e.g. \"ollama pull qwen2.5vl:7b\" (about 6 GB, needs a GPU with 8 GB or more) or "
+               "\"gemma3:4b\" for smaller cards."),
 }
 
 
@@ -70,6 +71,7 @@ class MainWindow(QWidget):
         self.looper: Looper | None = None
         self.game = None
         self.overlay = TranslationOverlay(settings["font_px"])
+        self.overlay.hide_in_captures = bool(settings["hide_in_captures"])
         self.picker = None
         self._build()
         self.pump_timer = QTimer(self, interval=200, timeout=self._pump)
@@ -85,45 +87,45 @@ class MainWindow(QWidget):
         root.addWidget(self.status)
 
         row = QHBoxLayout()
-        self.pick_btn = QPushButton("Chat-Bereich markieren", clicked=self.pick_region)
-        self.shot_btn = QPushButton("Letzten Ausschnitt zeigen", clicked=self.show_last_picture)
-        self.run_btn = QPushButton("Starten", clicked=self.toggle)
+        self.pick_btn = QPushButton("Mark chat area", clicked=self.pick_region)
+        self.shot_btn = QPushButton("Show last capture", clicked=self.show_last_picture)
+        self.run_btn = QPushButton("Start", clicked=self.toggle)
         row.addWidget(self.pick_btn)
         row.addWidget(self.shot_btn)
         row.addWidget(self.run_btn)
         root.addLayout(row)
 
         grid = QGridLayout()
-        grid.addWidget(QLabel("Übersetzen nach:"), 0, 0)
+        grid.addWidget(QLabel("Translate to:"), 0, 0)
         self.target = QComboBox()
         for code in translate.LANGUAGES:
-            self.target.addItem(code.upper(), code)
+            self.target.addItem("%s (%s)" % (translate.LANGUAGES[code], code.upper()), code)
         self.target.setCurrentIndex(list(translate.LANGUAGES).index(s["target"]))
         self.target.currentIndexChanged.connect(self._settings_changed)
         grid.addWidget(self.target, 0, 1)
-        grid.addWidget(QLabel("Dienst:"), 1, 0)
+        grid.addWidget(QLabel("Service:"), 1, 0)
         self.service = QComboBox()
         for sid, (label, _cloud) in services.SERVICES.items():
             self.service.addItem(label, sid)
         self.service.setCurrentIndex(list(services.SERVICES).index(s["service"]))
         self.service.currentIndexChanged.connect(self._service_changed)
         grid.addWidget(self.service, 1, 1)
-        grid.addWidget(QLabel("Modell:"), 2, 0)
+        grid.addWidget(QLabel("Model:"), 2, 0)
         model_row = QHBoxLayout()
         self.model = QComboBox()
         self.model.activated.connect(self._settings_changed)
         self._edit_hooked = None
         model_row.addWidget(self.model, 1)
-        self.local_btn = QPushButton("Lokale Modelle laden", clicked=self._load_local_models)
+        self.local_btn = QPushButton("Load local models", clicked=self._load_local_models)
         model_row.addWidget(self.local_btn)
         grid.addLayout(model_row, 2, 1)
-        self.key_label = QLabel("API-Key:")
+        self.key_label = QLabel("API key:")
         grid.addWidget(self.key_label, 3, 0)
         key_row = QHBoxLayout()
         self.key = QLineEdit()
         self.key.setEchoMode(QLineEdit.EchoMode.Password)
         key_row.addWidget(self.key)
-        self.key_btn = QPushButton("Speichern", clicked=self._save_key)
+        self.key_btn = QPushButton("Save", clicked=self._save_key)
         key_row.addWidget(self.key_btn)
         grid.addLayout(key_row, 3, 1)
         self.key_link = QLabel()
@@ -132,25 +134,33 @@ class MainWindow(QWidget):
         grid.addWidget(self.key_link, 4, 1)
         root.addLayout(grid)
 
-        self.show_all = QCheckBox("Auch Zeilen in meiner Sprache zeigen")
+        self.show_all = QCheckBox("Also show messages already in my language")
         self.show_all.setChecked(bool(s["show_all"]))
         self.show_all.toggled.connect(self._settings_changed)
         root.addWidget(self.show_all)
+        self.background = QCheckBox("Also read while DBD is in the background (only while no window covers the chat)")
+        self.background.setChecked(bool(s["read_background"]))
+        self.background.toggled.connect(self._settings_changed)
+        root.addWidget(self.background)
+        self.hide_caps = QCheckBox("Hide the translation in screenshots and recordings")
+        self.hide_caps.setChecked(bool(s["hide_in_captures"]))
+        self.hide_caps.toggled.connect(self._settings_changed)
+        root.addWidget(self.hide_caps)
         self.notice = QLabel()
         self.notice.setWordWrap(True)
         root.addWidget(self.notice)
-        self.accept = QCheckBox("Verstanden")
+        self.accept = QCheckBox("I understand")
         self.accept.toggled.connect(self._settings_changed)
         root.addWidget(self.accept)
 
         self.history = QTextBrowser()
         self.history.setOpenLinks(False)
-        self.history.setPlaceholderText("Übersetzte Nachrichten erscheinen hier.")
+        self.history.setPlaceholderText("Translated messages appear here.")
         root.addWidget(self.history, 1)
         bottom = QHBoxLayout()
         self.costs = QLabel()
         bottom.addWidget(self.costs, 1)
-        self.update_btn = QPushButton("Nach Updates suchen", clicked=self.update_clicked)
+        self.update_btn = QPushButton("Check for updates", clicked=self.update_clicked)
         bottom.addWidget(self.update_btn)
         root.addLayout(bottom)
         self._update = None          # last update.Check
@@ -181,10 +191,10 @@ class MainWindow(QWidget):
             w.setVisible(cloud)
         self.local_btn.setVisible(service == "ollama")
         self.key.clear()
-        self.key.setPlaceholderText("gespeichert" if s.has_stored_key(service) else "API-Key einfügen")
+        self.key.setPlaceholderText("saved" if s.has_stored_key(service) else "Paste API key")
         if cloud:
             url = services.KEY_URL[service]
-            self.key_link.setText('Key holen: <a href="%s">%s</a>' % (url, url))
+            self.key_link.setText('Get a key: <a href="%s">%s</a>' % (url, url))
         self.notice.setText(NOTICES[service])
         self.accept.setVisible(cloud)
         self.accept.setChecked(s.accepted(service))
@@ -217,6 +227,9 @@ class MainWindow(QWidget):
         if s["show_all"] != self.show_all.isChecked():
             s["show_all"] = self.show_all.isChecked()
             self._render_history()
+        s["read_background"] = self.background.isChecked()
+        s["hide_in_captures"] = self.hide_caps.isChecked()
+        self.overlay.hide_in_captures = s["hide_in_captures"]
         if services.is_cloud(service):
             s.set_accepted(service, self.accept.isChecked())
         s.save()
@@ -227,7 +240,7 @@ class MainWindow(QWidget):
     def _load_local_models(self):
         names = ollama.installed_models(int(self.settings["ollama_port"]))
         if not names:
-            self.status.setText(ERRORS["server"] + " Oder noch kein Modell geladen.")
+            self.status.setText(ERRORS["server"] + " Or no model pulled yet.")
             return
         self._filling = True
         current = self._model_text()
@@ -238,7 +251,7 @@ class MainWindow(QWidget):
         self.model.setCurrentIndex(i if i >= 0 else 0)
         self._filling = False
         self._settings_changed()
-        self.status.setText("%d lokale Modelle gefunden." % len(names))
+        self.status.setText("%d local models found." % len(names))
 
     def _save_key(self):
         text = self.key.text().strip()
@@ -247,7 +260,7 @@ class MainWindow(QWidget):
             return
         stored = self.settings.set_api_key(service, text)
         self.key.clear()
-        self.key.setPlaceholderText("gespeichert" if stored else "nur für diese Sitzung")
+        self.key.setPlaceholderText("saved" if stored else "for this session only")
         if self.running:
             self._start_worker()
         self._refresh()
@@ -256,7 +269,7 @@ class MainWindow(QWidget):
         """The picture last sent to the service, exactly as cut out (only in memory, never a file)."""
         img = self.engine.last_sent
         if img is None:
-            self.status.setText("Noch nichts gesendet – erst starten und im Chat schreiben lassen.")
+            self.status.setText("Nothing sent yet – start first and wait for chat messages.")
             return
         from PySide6.QtGui import QImage, QPixmap
         import numpy as np
@@ -264,7 +277,7 @@ class MainWindow(QWidget):
         h, w = rgb.shape[:2]
         pic = QPixmap.fromImage(QImage(rgb.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy())
         view = QLabel()
-        view.setWindowTitle("Gesendeter Ausschnitt – %d × %d px" % (w, h))
+        view.setWindowTitle("Sent capture – %d × %d px" % (w, h))
         view.setPixmap(pic)
         view.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self._picture_view = view
@@ -279,11 +292,11 @@ class MainWindow(QWidget):
 
     # ---------------------------------------------------------------- updates (only on click)
     UPDATE_TEXT = {
-        "current": "Fog Translate ist aktuell.",
-        "dirty": "Update nicht möglich: Dateien im Programmordner wurden geändert.",
-        "branch": "Update nicht möglich: nicht auf dem Zweig „main“.",
-        "ahead": "Update nicht möglich: eigene Commits im Programmordner.",
-        "error": "Update-Prüfung fehlgeschlagen (keine Verbindung zu GitHub?).",
+        "current": "Fog Translate is up to date.",
+        "dirty": "Cannot update: files in the program folder were changed.",
+        "branch": "Cannot update: not on the \"main\" branch.",
+        "ahead": "Cannot update: the program folder has its own commits.",
+        "error": "Update check failed (no connection to GitHub?).",
     }
 
     def update_clicked(self):
@@ -298,7 +311,7 @@ class MainWindow(QWidget):
             QDesktopServices.openUrl(QUrl(update.REPO_URL))
             return
         self.update_btn.setEnabled(False)
-        self.update_btn.setText("Suche …")
+        self.update_btn.setText("Checking …")
         import threading
         threading.Thread(target=lambda: self.results.put(("update", update.check())), name="update",
                          daemon=True).start()
@@ -307,13 +320,13 @@ class MainWindow(QWidget):
         self._update = c
         self.update_btn.setEnabled(True)
         if c.state == "behind":
-            self.update_btn.setText("Aktualisieren und neu starten")
-            self.status.setText("Update verfügbar (%d Änderung%s)." % (c.behind, "" if c.behind == 1 else "en"))
+            self.update_btn.setText("Update and restart")
+            self.status.setText("Update available (%d change%s)." % (c.behind, "" if c.behind == 1 else "s"))
         elif c.state == "newer":
-            self.update_btn.setText("Download-Seite öffnen")
-            self.status.setText("Version %s ist verfügbar (installiert: %s)." % (c.remote_version, __version__))
+            self.update_btn.setText("Open download page")
+            self.status.setText("Version %s is available (installed: %s)." % (c.remote_version, __version__))
         else:
-            self.update_btn.setText("Nach Updates suchen")
+            self.update_btn.setText("Check for updates")
             self.status.setText(self.UPDATE_TEXT.get(c.state, c.state))
         log.info("Update-Prüfung: %s", c.state)
 
@@ -323,8 +336,8 @@ class MainWindow(QWidget):
             self.toggle()
         if not update.apply():
             self._update = None
-            self.update_btn.setText("Nach Updates suchen")
-            self.status.setText("Update nicht möglich (siehe Log).")
+            self.update_btn.setText("Check for updates")
+            self.status.setText("Update failed (see log).")
             log.warning("Update: Fast-Forward nicht möglich")
             return
         log.info("Update installiert, Neustart")
@@ -332,7 +345,7 @@ class MainWindow(QWidget):
             self.close()
             QApplication.quit()
         else:
-            self.status.setText("Update installiert – bitte Fog Translate neu starten.")
+            self.status.setText("Update installed – please restart Fog Translate.")
 
     # ---------------------------------------------------------------- region
     def pick_region(self):
@@ -363,7 +376,9 @@ class MainWindow(QWidget):
         self.engine.status, self.engine.error = "starting", ""
         settings = self.settings
         log.info("Start: Dienst %s", settings["service"])
-        self.looper = Looper(self.engine, lambda: services.make(settings), self.results.put, settings["look_s"])
+        overlay = self.overlay
+        self.looper = Looper(self.engine, lambda: services.make(settings), self.results.put, settings["look_s"],
+                             own_rects=lambda: [r for r in (overlay.rect_on_screen,) if r])
         self.looper.start()
 
     def _stop_looper(self):
@@ -383,7 +398,7 @@ class MainWindow(QWidget):
         else:
             service = self.settings["service"]
             if not self.settings.accepted(service):
-                self.status.setText("Bitte erst den Hinweis unten bestätigen.")
+                self.status.setText("Please confirm the notice below first.")
                 return
             self.running = True
             self._start_looper()
@@ -434,10 +449,10 @@ class MainWindow(QWidget):
         if e.status == "error":
             text = ERRORS.get(e.error, e.error)
         self.status.setText(text)
-        self.run_btn.setText("Stoppen" if self.running else "Starten")
+        self.run_btn.setText("Stop" if self.running else "Start")
         now = datetime.now()
         spent = float(self.settings["spent"].get(now.strftime("%Y-%m"), 0.0))
-        self.costs.setText("Heute %d Anfragen · diesen Monat ca. %.2f $ (geschätzt)"
+        self.costs.setText("Today %d requests · this month about $%.2f (estimated)"
                            % (self.settings.requests_today(now.strftime("%Y-%m-%d")), spent))
 
     def closeEvent(self, event):

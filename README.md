@@ -12,12 +12,13 @@ nebeneinander.
 
 ## Was das Programm tut – und was nicht
 
-- Liest **nur Bildschirmpixel** des markierten Bereichs (wie OBS oder Discord-Bildschirmfreigabe), und nur,
-  solange DBD das aktive Fenster ist.
+- Liest **nur Bildschirmpixel** des markierten Bereichs (wie OBS oder Discord-Bildschirmfreigabe). Ist DBD im
+  Hintergrund, nur solange kein anderes Fenster über dem Chat liegt (abschaltbar).
 - **Keine Eingaben ans Spiel**, kein Zugriff auf den Spielprozess, keine Spieldateien. Es schreibt nichts in den
   Chat.
-- Das Übersetzungsfenster ist von Bildschirmaufnahmen ausgenommen – es taucht nicht in OBS-Aufnahmen, Screenshots
-  oder in der Erkennung von Fog Scout auf.
+- Das Übersetzungsfenster ist in Screenshots und Aufnahmen sichtbar; wer das nicht will, setzt das Häkchen
+  „Hide the translation in screenshots and recordings“. Das Programm liest seine eigene Übersetzung nie mit.
+- Die Oberfläche ist Englisch.
 - **Internet:** nur zum gewählten Dienst (siehe unten). Gesendet wird das Bild des markierten Bereichs – **es kann
   Spielernamen und Nachrichten anderer Spieler zeigen** – und die Zielsprache. Nur wenn sich dort etwas geändert
   hat, höchstens alle 3 s (Gemini: 6,5 s), höchstens 300 Anfragen am Tag (einstellbar in `settings.json`).
@@ -31,7 +32,7 @@ nebeneinander.
 | **Gemini** (Google) | kostenloser API-Key von https://aistudio.google.com/apikey | kostenlose Stufe (ca. 10 Anfragen/min, Tageskontingent) | gehen an Google; in der kostenlosen Stufe darf Google sie zur Produktverbesserung nutzen |
 | **Ollama** (lokal) | [Ollama](https://ollama.com) + Bildmodell, z. B. `ollama pull qwen2.5vl:7b` (≈ 6 GB, Grafikkarte ≥ 8 GB) oder `gemma3:4b` | gratis | bleiben auf dem PC |
 
-Bei Ollama spricht das Programm nur mit `127.0.0.1` (Port einstellbar, Standard 11434). „Lokale Modelle laden“
+Bei Ollama spricht das Programm nur mit `127.0.0.1` (Port einstellbar, Standard 11434). „Load local models“
 füllt die Liste mit den installierten Modellen.
 
 ## Starten
@@ -40,22 +41,22 @@ füllt die Liste mit den installierten Modellen.
 2. `start.bat` doppelklicken (beim ersten Mal werden die Pakete installiert, alle Versionen fest und per SHA-256
    geprüft).
 3. Dienst wählen, API-Key eintragen (nicht bei Ollama), Hinweis bestätigen.
-4. DBD öffnen, **Chat-Bereich markieren** (Rahmen um den Chat aufziehen, Esc bricht ab), **Starten**.
+4. DBD öffnen, **Mark chat area** (Rahmen um den Chat aufziehen, Esc bricht ab), **Start**.
 
 Test ohne Spiel: `.venv\Scripts\python -m fogtranslate --test chat.png [--service gemini]` übersetzt einen
 Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_API_KEY`.
 
 ## Updates
 
-Knopf **„Nach Updates suchen“** unten rechts – das Programm fragt GitHub nur auf diesen Klick.
+Knopf **Check for updates** unten rechts – das Programm fragt GitHub nur auf diesen Klick.
 
-- Mit `git clone` installiert: zeigt, ob es Neues gibt; **„Aktualisieren und neu starten“** holt es (nur wenn im
+- Mit `git clone` installiert: zeigt, ob es Neues gibt; **Update and restart** holt es (nur wenn im
   Ordner nichts geändert wurde) und startet neu. `start.bat` installiert geänderte Pakete dabei automatisch.
 - Als ZIP installiert: zeigt die neue Versionsnummer und öffnet die Download-Seite.
 
 ## Wenn etwas nicht stimmt
 
-- **„Letzten Ausschnitt zeigen“** zeigt genau das Bild, das zuletzt verschickt wurde. Sind Zeilen rechts
+- **Show last capture** zeigt genau das Bild, das zuletzt verschickt wurde. Sind Zeilen rechts
   abgeschnitten, den Bereich neu markieren – etwas breiter als der Chat.
 - Log: `%LOCALAPPDATA%\FogTranslate\fogtranslate.log`, bei einem Absturz zusätzlich `crash.txt`.
 
