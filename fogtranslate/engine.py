@@ -53,7 +53,7 @@ class Engine:
         if game is None or rel is None:
             return None
         cx, cy, cw, ch = game.client
-        x, y, w, h = geometry.from_relative(rel, geometry.viewport(cw, ch))
+        x, y, w, h = geometry.from_relative(rel, geometry.window_space(cw, ch))
         return cx + x, cy + y, w, h
 
     @_locked

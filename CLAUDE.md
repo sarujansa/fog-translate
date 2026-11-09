@@ -39,8 +39,11 @@ Code und Kommentare Englisch.
 
 ## Setup des Nutzers
 
-Samsung G5 3440×1440, DBD (Steam/Epic/MS Store) im Fenster-Vollbild, rendert 16:9 = 2560×1440 zentriert (Balken je
-440 px). Bereiche daher relativ zum 16:9-Viewport (`geometry.viewport`). Win32 und mss rechnen in
+Samsung G5 3440×1440, DBD (Steam/Epic/MS Store) im Fenster-Vollbild. Im Match rendert DBD 16:9 = 2560×1440
+zentriert (Balken je 440 px), **Lobby, Menüs und Ergebnisbildschirm nutzen aber die volle Breite** – der Chat sitzt
+dort rechts vom 16:9-Bild (x ≈ 2800–3280). Bereiche daher relativ zum **ganzen Spielfenster**
+(`geometry.window_space`, `region_space` = "window"), nie auf 16:9 beschneiden (bis 0.7 endete jeder Rahmen bei
+x = 3000; ältere Bereiche werden verworfen). Win32 und mss rechnen in
 physischen Pixeln, Qt bei Windows-Skalierung > 100 % in logischen (physisch / Faktor): **jede** Stelle, an der ein
 Bildschirm-Rechteck ein Qt-Fenster trifft, rechnet über `qtgeom` (`ratio`, `to_qt`, `from_qt`) – Overlay, Bildschirmfläche
 (Sarus Test 09.11.2026: abgeschnittene Zeilen). Markiert wird seit 0.7 auf einem **Standbild** des Spielfensters in
@@ -51,7 +54,7 @@ kamen die Klicks beim Nutzer nicht an). `QT_ENABLE_HIGHDPI_SCALING=0` bleibt zus
 
 | Datei | Aufgabe |
 |---|---|
-| `geometry.py` | (rein) `viewport`, `to_relative`/`from_relative`, `valid_region`, `overlay_spot` |
+| `geometry.py` | (rein) `window_space` (Raum der Bereiche = ganzes Spielfenster), `viewport` (16:9, nur noch Hilfsfunktion), `to_relative`/`from_relative`, `valid_region`, `overlay_spot` |
 | `change.py` | (rein) `ChangeGate`: Anfrage nur bei geändertem Bild, `SETTLE_LOOKS` ruhig, nicht bei leerem Bereich |
 | `lines.py` | (rein) `ChatLine`, `same_message` (gleich, Teil des anderen ab `MIN_PART` oder Ähnlichkeit ≥ `SIMILAR`, gleicher oder leerer Absender), `Transcript.add` → (neu, ersetzt): bessere Lesung (länger) ersetzt frühere Bruchstücke an Ort und Stelle, nie doppelt (Sarus Test 09.11.2026: umgebrochene russische Nachricht) |
 | `translate.py` | Gemeinsames aller Dienste: `SYSTEM`, `SCHEMA`, `LANGUAGES`, `png_bytes`, `parse`/`answer_lines`, `TranslateError.kind`, `Worker`-Thread |

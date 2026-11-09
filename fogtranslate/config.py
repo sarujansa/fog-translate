@@ -14,7 +14,8 @@ APP_DIR = "FogTranslate"
 ENV = "FOGTRANSLATE_DATA_DIR"            # tests
 
 DEFAULTS = {
-    "region": None,                  # [x, y, w, h] relative to the 16:9 viewport
+    "region": None,                  # [x, y, w, h] relative to the whole game window (client area)
+    "region_space": "",              # "window" – a region saved before 0.7.1 (16:9 space, clipped) is dropped
     "target": "de",
     "service": services.DEFAULT,     # claude | gemini | ollama
     "claude_model": services.DEFAULT_MODEL["claude"],
@@ -77,8 +78,10 @@ class Settings:
                 if k in DEFAULTS and (DEFAULTS[k] is None or isinstance(v, type(DEFAULTS[k]))
                                       or (isinstance(DEFAULTS[k], float) and isinstance(v, int))):
                     self.values[k] = v
-        if self.values["region"] is not None and not geometry.valid_region(self.values["region"]):
-            self.values["region"] = None
+        if self.values["region"] is not None and (self.values["region_space"] != "window"
+                                                  or not geometry.valid_region(self.values["region"])):
+            self.values["region"] = None            # also: marked before 0.7.1 → mark again
+        self.values["region_space"] = "window"
         if self.values["target"] not in translate.LANGUAGES:
             self.values["target"] = "de"
         if self.values["service"] not in services.SERVICES:

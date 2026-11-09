@@ -1,7 +1,9 @@
-"""Pure geometry: the 16:9 picture DBD draws inside its window, and regions relative to it.
+"""Pure geometry: regions relative to the game window.
 
-DBD renders 16:9 centred (on 3440×1440: 2560×1440 with black bars of 440 px left and right). A region is stored
-relative to that viewport (0..1), so it survives another window size or monitor.
+A region is stored relative to the whole client area of the game window (0..1). Not relative to the 16:9
+picture: in a match DBD renders 16:9 centred (on 3440×1440: 2560×1440 with black bars), but lobby, menus and the
+result screen use the full width on ultrawide – the chat sits right of the 16:9 picture there, and clipping to
+16:9 cut it off (Saru, 09.11.2026: the box always ended at x = 3000 of 3440).
 """
 from __future__ import annotations
 
@@ -18,6 +20,11 @@ def viewport(width: int, height: int) -> tuple[int, int, int, int]:
         return (width - w) // 2, 0, w, height
     h = round(width / ASPECT)                         # taller: bars top and bottom
     return 0, (height - h) // 2, width, h
+
+
+def window_space(width: int, height: int) -> tuple[int, int, int, int]:
+    """The space regions are relative to: the whole client area."""
+    return 0, 0, max(0, int(width)), max(0, int(height))
 
 
 def to_relative(box, view) -> tuple[float, float, float, float] | None:

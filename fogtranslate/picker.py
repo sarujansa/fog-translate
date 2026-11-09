@@ -87,13 +87,13 @@ class Canvas(QWidget):
 
 class RegionPicker(QWidget):
     """``picture`` = BGR screenshot of the game's client area (its pixels are screen pixels);
-    ``done(rel_or_None)`` – the box relative to the 16:9 picture DBD draws, or None when cancelled."""
+    ``done(rel_or_None)`` – the box relative to the whole game window, or None when cancelled."""
 
     def __init__(self, picture, done, current=None):
         super().__init__(None, Qt.WindowType.Window)
         self.setWindowTitle("Mark chat area")
         h, w = np.asarray(picture).shape[:2]
-        self.view = geometry.viewport(w, h)
+        self.view = geometry.window_space(w, h)
         self._done = done
         self._finished = False
         box = geometry.from_relative(current, self.view) if current else None
