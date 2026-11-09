@@ -53,9 +53,9 @@ def test_a_zip_install_compares_the_version_on_github(monkeypatch):
 def test_packages_are_reinstalled_only_when_requirements_changed(tmp_path):
     req = tmp_path / "requirements.txt"
     stamp = tmp_path / "stamp"
-    req.write_text("a==1\n")
+    req.write_bytes(b"a==1\n")                                         # bytes: no \r\n on Windows
     assert deps.needed(str(req), str(stamp))                           # first start
     stamp.write_text(hashlib.sha256(b"a==1\n").hexdigest())
     assert not deps.needed(str(req), str(stamp))
-    req.write_text("a==2\n")                                           # after an update
+    req.write_bytes(b"a==2\n")                                           # after an update
     assert deps.needed(str(req), str(stamp))
