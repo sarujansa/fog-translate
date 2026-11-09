@@ -445,6 +445,11 @@ class MainWindow(QWidget):
             elif kind == "answer":
                 if self.engine.answer(value):
                     self._render_history()
+                if self.engine.last_counts:
+                    log.info("Answer: %(read)d messages read, %(foreign)d foreign, %(new)d new, %(replaced)d replaced",
+                             self.engine.last_counts)
+                elif hasattr(value, "kind"):
+                    log.info("Answer: error %s", value.kind)
                 self.settings.save()
         if self.running:
             self._refresh_overlay()
