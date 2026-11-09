@@ -45,6 +45,14 @@ füllt die Liste mit den installierten Modellen.
 Test ohne Spiel: `.venv\Scripts\python -m fogtranslate --test chat.png [--service gemini]` übersetzt einen
 Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_API_KEY`.
 
+## Updates
+
+Knopf **„Nach Updates suchen“** unten rechts – das Programm fragt GitHub nur auf diesen Klick.
+
+- Mit `git clone` installiert: zeigt, ob es Neues gibt; **„Aktualisieren und neu starten“** holt es (nur wenn im
+  Ordner nichts geändert wurde) und startet neu. `start.bat` installiert geänderte Pakete dabei automatisch.
+- Als ZIP installiert: zeigt die neue Versionsnummer und öffnet die Download-Seite.
+
 ## Wenn etwas nicht stimmt
 
 - **„Letzten Ausschnitt zeigen“** zeigt genau das Bild, das zuletzt verschickt wurde. Sind Zeilen rechts

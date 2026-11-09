@@ -22,6 +22,11 @@ Code und Kommentare Englisch.
   Cloud-Dienstes bestätigt der Nutzer, dass das Bild Spielernamen/Nachrichten anderer zeigen kann (`accepted` je
   Dienst; bei Gemini mit Hinweis auf die Datennutzung der kostenlosen Stufe). Grenzen: `min_gap_s`, `daily_cap`, nur bei geändertem + ruhigem Bild
   (`change.ChangeGate`), Gemini ≥ `engine.SERVICE_GAP_S`, nach „Limit erreicht“ `QUOTA_WAIT_S` Pause.
+- **Updates nur auf Klick** („Nach Updates suchen“, `update.py`): Git-Installation `git fetch origin main` (ohne
+  Hooks, ohne Passwortabfrage), dann nur Fast-Forward – nie bei geänderten Dateien, anderem Zweig oder eigenen
+  Commits; Neustart über `start.bat`. ZIP-Installation: nur die Versionszeile von `update.VERSION_URL` lesen und die
+  Seite öffnen, nichts herunterladen. Nichts über den Nutzer senden. `start.bat` → `deps.py` installiert Pakete neu,
+  wenn sich `requirements.txt` geändert hat (SHA-256 in `.venv\requirements.sha256`).
 - API-Key nur DPAPI-verschlüsselt (`secret.py`), nie Klartext, nie ins Log; ohne DPAPI nur für die Sitzung.
 - Antworten des Dienstes nur als Klartext anzeigen, Steuerzeichen/Bidi entfernt (`translate.parse`).
 - Wächter: `tests/test_guards.py`. Neue Features, die gegen diese Regeln verstoßen: nachfragen.
@@ -44,6 +49,7 @@ Samsung G5 3440×1440, DBD (Steam/Epic/MS Store) im Fenster-Vollbild, rendert 16
 | `engine.py`, `looper.py` | Schleife ohne Qt: `look` (nur DBD vorn), `_try_send` (Abstand, Tageslimit), `answer`, `visible`, `last_sent` (nur Speicher, „Letzten Ausschnitt zeigen“); ein `RLock`, weil zwei Threads. `Looper` = Blick-Thread: baut den Übersetzer (SDK-Import dauert unter Windows Sekunden) und macht Fenster suchen/Aufnahme/Vergleich – **nie im Fenster-Thread**; meldet `started`/`start_failed`/`tick`/`answer` über die Queue |
 | `window.py`, `grab.py` | DBD-Fenster (nur Fensterinfos; Titel mit festem Puffer, keine Längenabfrage, die eine Nachricht schicken könnte), mss-Ausschnitt |
 | `secret.py`, `config.py` | DPAPI, `Settings` in `%LOCALAPPDATA%\FogTranslate` (`FOGTRANSLATE_DATA_DIR` in Tests; Keys je Dienst `api_key(service)`, `accepted(service)`, übernimmt 0.1-Schlüssel) |
+| `update.py`, `deps.py` | Update auf Klick (`check` → `Check.state` current/behind/ahead/dirty/branch/newer/error, `apply` = `merge --ff-only`, `restart`), Pakete nach Update (`needed`, `main`, nur Standardbibliothek) |
 | `icon.py` | Logo per QPainter (zwei Sprechblasen + Nebel, `paint`/`pixmap`/`icon`, `SIZES`), `set_app_id` (eigenes Taskleisten-Symbol); `assets/logo.png` erzeugt `tools/export_logo.py` – nach Änderungen an der Zeichnung neu erzeugen |
 | `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig, von Aufnahmen ausgenommen), Bereich markieren, Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads), Start/`--test`; `__main__._log_setup`: Log, unbehandelte Fehler aller Threads ins Log, `faulthandler` → `crash.txt` |
 

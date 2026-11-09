@@ -29,7 +29,8 @@ def test_no_input_or_process_apis():
             assert not re.search(r"\b" + word + r"\b", text), (name, word)
 
 
-NETWORK = {"claude.py", "gemini.py", "ollama.py", "http.py"}     # the services and their HTTP helper only
+NETWORK = {"claude.py", "gemini.py", "ollama.py", "http.py",     # the services and their HTTP helper
+           "update.py"}                                         # GitHub, only on the user's click
 
 
 def test_only_the_services_talk_to_the_network():

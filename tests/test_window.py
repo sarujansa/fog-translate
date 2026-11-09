@@ -83,3 +83,15 @@ def test_the_logo_is_drawn_at_every_size(app):
         corner, middle = pm.toImage().pixelColor(0, 0), pm.toImage().pixelColor(n // 2, n // 2)
         assert corner.alpha() == 0 and middle.alpha() == 255      # rounded tile, opaque inside
     assert len(ic.availableSizes()) == len(icon.SIZES)
+
+
+def test_the_update_button_follows_the_check(app):
+    from fogtranslate.update import Check
+    win = MainWindow(Settings())
+    win._update_checked(Check("behind", 2))
+    assert win.update_btn.text() == "Aktualisieren und neu starten" and "2 Änderungen" in win.status.text()
+    win._update_checked(Check("newer", remote_version="9.9"))
+    assert win.update_btn.text() == "Download-Seite öffnen"
+    win._update_checked(Check("dirty"))
+    assert win.update_btn.text() == "Nach Updates suchen" and "geändert" in win.status.text()
+    win.close()

@@ -294,3 +294,20 @@ def test_a_failing_start_is_reported_not_raised():
     loop.join(2)
     kind, err = q.get(timeout=1)
     assert kind == "start_failed" and err.kind == "key"
+
+
+def test_a_screen_grabber_that_cannot_start_is_reported():
+    import queue
+    from fogtranslate.looper import Looper
+
+    eng, _ = _engine()
+    q = queue.Queue()
+
+    def broken():
+        raise OSError("no display")
+
+    loop = Looper(eng, lambda: object(), q.put, 0.2, grabber_factory=broken)
+    loop.start()
+    loop.join(2)
+    kinds = [q.get(timeout=1)[0], q.get(timeout=1)[0]]
+    assert kinds == ["started", "start_failed"] and not loop.is_alive()
