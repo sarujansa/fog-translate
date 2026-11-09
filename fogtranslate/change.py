@@ -1,62 +1,133 @@
-"""Pure: decides when the chat region shows something new and settled, so Claude is asked only then.
+"""Pure: decides when the chat region shows new text, so the service is asked only then.
 
-Each look is shrunk to a small grey picture. A request is due when the picture differs from the one last sent
-and has stayed the same for ``SETTLE_LOOKS`` looks (no request in the middle of a fade or while a line scrolls
-in). A nearly uniform picture (chat hidden, loading screen) is never sent.
+Only *text* is compared, not the whole picture: a pixel counts as text when it is clearly brighter than its
+neighbourhood (sharp bright strokes) **and** sits on the chat's near-black panel (something dark right next to it). The lobby behind the chat moves all the time (fire, characters, smoke) –
+comparing raw pixels, the picture never "settled" and nothing was ever sent once the marked box reached past the
+chat panel (Saru, 09.11.2026). Soft glow and figures behind the darkened panel have no sharp edges and drop out.
+
+A request is due when the text differs from the text last sent and
+* has stayed the same for ``SETTLE_LOOKS`` looks (no request while a line scrolls in), or
+* has kept changing for ``MAX_WAIT_LOOKS`` looks anyway (something in the box never stops moving).
+A box with almost no text (chat hidden, loading screen) is never sent.
 """
 from __future__ import annotations
 
 import numpy as np
 
-SMALL_W = 160            # width of the comparison picture
-PIXEL_DIFF = 18          # grey levels a pixel must change by to count
-CHANGED_SHARE = 0.004    # share of changed pixels that makes a picture "different"
+EDGE = 40.0              # grey levels a text pixel is brighter than the mean around it
+MIN_BRIGHT = 110.0       # text in the DBD chat is light (white, yellow, green, orange)
+WINDOW = 7               # side of the neighbourhood for that mean
+DARK = 55.0              # the chat panel: a text pixel has something this dark within its neighbourhood
+LONG = 30                # a straight run this long is an edge (panel border, scroll bar), not a letter
+CHANGED_SHARE = 0.0005   # share of the box whose text must differ to count as "different"
+MIN_CHANGED_PX = 60      # … and at least this many pixels (flicker: < 45; a short line like "gg": ~150)
+MIN_TEXT_PX = 60         # fewer text pixels = nothing to read
 SETTLE_LOOKS = 2         # equal looks in a row before a request
-MIN_CONTRAST = 12.0      # standard deviation below this = empty/uniform region
+MAX_WAIT_LOOKS = 4       # changed text is sent after this many looks even if the box never settles
 
 
-def small(img: np.ndarray) -> np.ndarray:
-    """BGR or grey picture → small grey float picture (pure numpy, no cv2 needed)."""
+def grey(img: np.ndarray) -> np.ndarray:
     a = np.asarray(img)
     if a.ndim == 3:
-        a = a[..., :3].astype(np.float32) @ np.array([0.114, 0.587, 0.299], np.float32)
-    else:
-        a = a.astype(np.float32)
-    h, w = a.shape
-    step = max(1, w // SMALL_W)
-    return a[::step, ::step]
+        return a[..., :3].astype(np.float32) @ np.array([0.114, 0.587, 0.299], np.float32)
+    return a.astype(np.float32)
 
 
-def differs(a: np.ndarray | None, b: np.ndarray | None) -> bool:
+def _box_mean(g: np.ndarray, k: int) -> np.ndarray:
+    """Mean over a k×k neighbourhood (integral image, edges padded)."""
+    p = k // 2
+    padded = np.pad(g, p, mode="edge")
+    s = np.pad(padded.cumsum(0).cumsum(1), ((1, 0), (1, 0)))
+    h, w = g.shape
+    total = s[k:k + h, k:k + w] - s[:h, k:k + w] - s[k:k + h, :w] + s[:h, :w]
+    return total / (k * k)
+
+
+def _box_min(g: np.ndarray, k: int) -> np.ndarray:
+    """Minimum over a k×k neighbourhood (separable: rows, then columns)."""
+    p = k // 2
+    padded = np.pad(g, p, mode="edge")
+    rows = np.lib.stride_tricks.sliding_window_view(padded, k, axis=1).min(axis=-1)
+    return np.lib.stride_tricks.sliding_window_view(rows, k, axis=0).min(axis=-1)
+
+
+def _long_runs(m: np.ndarray, n: int, axis: int) -> np.ndarray:
+    """Pixels that belong to a straight run of at least ``n`` set pixels along ``axis``."""
+    length = m.shape[axis]
+    if length < n:
+        return np.zeros_like(m)
+    full = np.lib.stride_tricks.sliding_window_view(m, n, axis=axis).all(axis=-1)    # window starts
+    out = np.zeros_like(m)
+    for k in range(n):                                    # spread each full window over its n pixels
+        if axis == 1:
+            out[:, k:k + full.shape[1]] |= full
+        else:
+            out[k:k + full.shape[0], :] |= full
+    return out
+
+
+def text_mask(img: np.ndarray) -> np.ndarray:
+    g = grey(img)
+    m = (g > MIN_BRIGHT) & (g - _box_mean(g, WINDOW) > EDGE) & (_box_min(g, WINDOW) < DARK)
+    return m & ~_long_runs(m, LONG, 1) & ~_long_runs(m, LONG, 0)
+
+
+def _grow(m: np.ndarray) -> np.ndarray:
+    """The mask grown by one pixel – a stroke read one pixel off is not a change."""
+    out = m.copy()
+    out[1:] |= m[:-1]
+    out[:-1] |= m[1:]
+    out[:, 1:] |= m[:, :-1]
+    out[:, :-1] |= m[:, 1:]
+    return out
+
+
+def changed_px(a: np.ndarray | None, b: np.ndarray | None) -> int:
+    """Text pixels in one mask with no text pixel near them in the other."""
+    if a is None or b is None or a.shape != b.shape:
+        return 10 ** 9
+    return int(np.count_nonzero(a & ~_grow(b)) + np.count_nonzero(b & ~_grow(a)))
+
+
+def differs(a, b) -> bool:
     if a is None or b is None or a.shape != b.shape:
         return True
-    return float(np.mean(np.abs(a - b) > PIXEL_DIFF)) > CHANGED_SHARE
+    n = changed_px(a, b)
+    return n >= MIN_CHANGED_PX and n > CHANGED_SHARE * a.size
 
 
 class ChangeGate:
-    def __init__(self, settle: int = SETTLE_LOOKS):
+    def __init__(self, settle: int = SETTLE_LOOKS, max_wait: int = MAX_WAIT_LOOKS):
         self.settle = settle
-        self._last = None        # previous look
-        self._same = 0           # looks in a row equal to the previous one
-        self._sent = None        # look last handed out for a request
+        self.max_wait = max_wait
+        self._last = None        # text of the previous look
+        self._same = 0           # looks in a row with the same text
+        self._sent = None        # text last handed out for a request
+        self._waiting = 0        # looks in a row whose text differed from the text sent
+        self.stats = {}          # for the log: text px, change to last look / to sent
 
     def reset(self):
         self._last = self._sent = None
-        self._same = 0
+        self._same = self._waiting = 0
 
     def look(self, img: np.ndarray) -> bool:
         """Feed one look; True when this picture should be sent now."""
-        s = small(img)
-        if self._last is not None and not differs(self._last, s):
+        m = text_mask(img)
+        to_last = changed_px(self._last, m) if self._last is not None else -1
+        if self._last is not None and not differs(self._last, m):
             self._same += 1
         else:
             self._same = 0
-        self._last = s
-        if self._same + 1 < self.settle:
+        self._last = m
+        text = int(np.count_nonzero(m))
+        new = differs(self._sent, m)
+        self._waiting = self._waiting + 1 if new and text >= MIN_TEXT_PX else 0
+        self.stats = {"text_px": text, "to_last": to_last, "settled": self._same + 1 >= self.settle,
+                      "waiting": self._waiting}
+        if text < MIN_TEXT_PX or not new:
             return False
-        if float(s.std()) < MIN_CONTRAST:
+        if self._same + 1 < self.settle and self._waiting < self.max_wait:
             return False
-        if not differs(self._sent, s):
-            return False
-        self._sent = s
+        self._sent = m
+        self._waiting = 0
         return True
