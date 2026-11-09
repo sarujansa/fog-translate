@@ -1,0 +1,146 @@
+# Builds Fog Translate as a Windows folder app (PyInstaller, installer/fogtranslate.spec) and its setup (Inno Setup,
+# installer/fogtranslate.iss) on every pull request and push to main; runs the packaged program's self-check, installs
+# the setup silently, checks it and uninstalls it again. On a push to main whose version has no release yet, the job
+# "release" publishes the setup and its SHA-256 as GitHub release v<version>. Only that job may write
+# (contents: write); pull requests never reach it. Unsigned.
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  exe:
+    name: exe
+    runs-on: windows-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.13"
+      - name: Pakete (nur Wheels, mit Prüfsummen) und PyInstaller
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $ErrorActionPreference = "Stop"
+          python -m pip install --require-hashes --only-binary=:all: -r requirements.txt -r requirements-build.txt
+      - name: Version
+        id: info
+        shell: pwsh
+        run: |
+          $version = python -c "import fogtranslate; print(fogtranslate.__version__)"
+          if ($version -notmatch '^[0-9]+(\.[0-9]+){1,3}$') { throw "Version '$version' unerwartet" }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "FT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: PyInstaller
+        run: python -m PyInstaller --noconfirm --clean installer/fogtranslate.spec
+      - name: Selbsttest der .exe
+        shell: pwsh
+        env:
+          FOGTRANSLATE_DATA_DIR: ${{ runner.temp }}\ft-data
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "selftest.json"
+          $p = Start-Process -FilePath "dist\FogTranslate\FogTranslate.exe" -ArgumentList "--selftest", "`"$out`"" -Wait -PassThru
+          if (Test-Path $out) { Get-Content $out } else { Write-Output "keine Ergebnisdatei" }
+          if ($p.ExitCode -ne 0) { throw "Selbsttest fehlgeschlagen (Code $($p.ExitCode))" }
+          if (-not (Get-Content $out -Raw | ConvertFrom-Json).checks.frozen.info) { throw "Selbsttest lief nicht als .exe" }
+          $size = (Get-ChildItem -Recurse "dist\FogTranslate" | Measure-Object -Sum Length).Sum / 1MB
+          Write-Output ("Ordnergröße: {0:N0} MB" -f $size)
+      - name: Inno Setup (fest, Prüfsumme)
+        shell: pwsh
+        env:
+          INNO_URL: https://github.com/jrsoftware/issrc/releases/download/is-7_1_1/innosetup-7.1.1-x64.exe
+          INNO_SHA256: 8a5a6711c3766a6e5fb74f280ba0e3551e719ce94538d901fdbd1f8f9920b3f0
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP "innosetup.exe"
+          Invoke-WebRequest -Uri $env:INNO_URL -OutFile $exe -MaximumRetryCount 5 -RetryIntervalSec 30
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToLower()
+          if ($hash -ne $env:INNO_SHA256) { throw "Inno Setup: Prüfsumme $hash passt nicht" }
+          $dir = Join-Path $env:RUNNER_TEMP "inno"
+          $p = Start-Process -FilePath $exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/CURRENTUSER", "/DIR=`"$dir`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Inno Setup: Installation Code $($p.ExitCode)" }
+          $iscc = Get-ChildItem -Path $dir -Recurse -Filter ISCC.exe | Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe nicht gefunden" }
+          "ISCC=$($iscc.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Installer bauen
+        shell: pwsh
+        run: |
+          & $env:ISCC "/DAppVersion=$env:FT_VERSION" installer\fogtranslate.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC: Code $LASTEXITCODE" }
+      - name: Installer ausprobieren (still installieren, prüfen, deinstallieren)
+        shell: pwsh
+        env:
+          FOGTRANSLATE_DATA_DIR: ${{ runner.temp }}\ft-data
+        run: |
+          $setup = "dist\FogTranslate-Setup-$env:FT_VERSION.exe"
+          $dir = Join-Path $env:RUNNER_TEMP "Fog Translate & Co"
+          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=`"$dir`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Setup: Code $($p.ExitCode)" }
+          foreach ($f in "FogTranslate.exe", "unins000.exe", "_internal\LICENSE") {
+            if (-not (Test-Path (Join-Path $dir $f))) { throw "nach der Installation fehlt $f" }
+          }
+          $lnk = Join-Path ([Environment]::GetFolderPath("Programs")) "Fog Translate.lnk"
+          if (-not (Test-Path $lnk)) { throw "Startmenü-Verknüpfung fehlt" }
+          $out = Join-Path $env:RUNNER_TEMP "selftest-installed.json"
+          $s = Start-Process -FilePath (Join-Path $dir "FogTranslate.exe") -ArgumentList "--selftest", "`"$out`"" -Wait -PassThru
+          Get-Content $out
+          if ($s.ExitCode -ne 0) { throw "Selbsttest der installierten .exe: Code $($s.ExitCode)" }
+          $u = Start-Process -FilePath (Join-Path $dir "unins000.exe") -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "Deinstallation: Code $($u.ExitCode)" }
+          Start-Sleep -Seconds 3
+          if (Test-Path (Join-Path $dir "FogTranslate.exe")) { throw "FogTranslate.exe nach der Deinstallation noch da" }
+          if (Test-Path $lnk) { throw "Verknüpfung nach der Deinstallation noch da" }
+          Write-Output ("Setup: {0:N0} MB" -f ((Get-Item $setup).Length / 1MB))
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: FogTranslate-Setup-${{ github.sha }}
+          path: dist/FogTranslate-Setup-*.exe
+          retention-days: 14
+          if-no-files-found: error
+
+  release:
+    name: release
+    needs: exe
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
+        with:
+          name: FogTranslate-Setup-${{ github.sha }}
+          path: setup
+      - name: GitHub-Release v<Version> mit Setup und Prüfsumme (nur wenn es die Version noch nicht gibt)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.exe.outputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}$ ]]
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then echo "$tag gibt es schon – kein neues Release"; exit 0; fi
+          cd setup
+          setup="FogTranslate-Setup-$VERSION.exe"
+          [ -f "$setup" ]
+          sha256sum "$setup" | awk '{print $1 "  " $2}' > "$setup.sha256"
+          sum=$(cut -d' ' -f1 "$setup.sha256")
+          {
+            printf 'Fog Translate %s, Commit %s\n\n' "$VERSION" "$GITHUB_SHA"
+            printf 'Download **%s**, run it, done (no admin rights needed). / Lade **%s**, starte es, fertig (keine Admin-Rechte nötig).\n\n' "$setup" "$setup"
+            printf 'SHA-256: `%s`\n\n' "$sum"
+            printf 'Not signed: Windows SmartScreen asks on the first start (More info → Run anyway). / Nicht signiert: SmartScreen fragt beim ersten Start (Weitere Informationen → Trotzdem ausführen).\n'
+          } > notes.md
+          gh release create "$tag" "$setup" "$setup.sha256" --target "$GITHUB_SHA" \
+            --title "Fog Translate $VERSION" --notes-file notes.md --latest

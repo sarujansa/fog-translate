@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from . import __version__
 
 REPO_URL = "https://github.com/sarujansa/fog-translate"
+RELEASES_URL = REPO_URL + "/releases/latest"
 VERSION_URL = "https://raw.githubusercontent.com/sarujansa/fog-translate/main/fogtranslate/__init__.py"
 BRANCH = "main"
 GIT_TIMEOUT_S = 60
@@ -38,7 +39,18 @@ def version_tuple(v: str) -> tuple:
     return tuple(int(x) for x in re.findall(r"\d+", v)[:4])
 
 
+def frozen() -> bool:
+    """The installed .exe (PyInstaller) – updated by downloading the new setup from the release page."""
+    return bool(getattr(sys, "frozen", False))
+
+
+def download_page() -> str:
+    return RELEASES_URL if frozen() else REPO_URL
+
+
 def is_git_checkout(root: str = ROOT) -> bool:
+    if frozen():
+        return False
     return os.path.isdir(os.path.join(root, ".git")) and shutil.which("git") is not None
 
 

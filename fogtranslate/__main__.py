@@ -40,7 +40,11 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="fogtranslate")
     ap.add_argument("--test", metavar="PICTURE", help="translate one picture (chat crop) once")
     ap.add_argument("--service", choices=("claude", "gemini", "ollama"), help="service for --test")
+    ap.add_argument("--selftest", metavar="RESULT.json", help="check the program, write the result, exit")
     args = ap.parse_args(argv)
+    if args.selftest:
+        from .selftest import run as selftest
+        return selftest(args.selftest)
     _log_setup()
     if args.test:
         import numpy as np

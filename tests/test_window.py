@@ -117,3 +117,12 @@ def test_the_status_says_when_the_marked_area_shows_no_text(app):
     assert win.status.text() == "Watching the chat …"
     win.running = False
     win.close()
+
+
+def test_the_selftest_passes(app, tmp_path, monkeypatch):
+    import json
+    from fogtranslate.selftest import run
+    out = tmp_path / "selftest.json"
+    assert run(str(out)) == 0
+    result = json.loads(out.read_text(encoding="utf-8"))
+    assert result["ok"] and result["checks"]["logo"]["info"] > 1000

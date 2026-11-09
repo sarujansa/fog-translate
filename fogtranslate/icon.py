@@ -113,3 +113,28 @@ def set_app_id():
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
     except (AttributeError, OSError):
         pass
+
+
+_KEEP: list = []
+
+
+def ico_bytes() -> bytes:
+    """The logo as a Windows .ico (16–256 px) – for the .exe and the installer. Needs a Qt GUI application."""
+    import io
+    from PIL import Image
+    from PySide6.QtCore import QBuffer, QIODevice
+    from PySide6.QtGui import QGuiApplication
+    if QGuiApplication.instance() is None:
+        _KEEP.append(QGuiApplication([]))                             # QPixmap needs one; keep it alive
+    buf = QBuffer()
+    buf.open(QIODevice.OpenModeFlag.WriteOnly)
+    pixmap(256).save(buf, "PNG")
+    big = Image.open(io.BytesIO(bytes(buf.data())))
+    out = io.BytesIO()
+    big.save(out, "ICO", sizes=[(n, n) for n in SIZES])
+    return out.getvalue()
+
+
+def save_ico(path: str) -> None:
+    with open(path, "wb") as fh:
+        fh.write(ico_bytes())

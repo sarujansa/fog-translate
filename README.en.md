@@ -47,7 +47,15 @@ side. Unofficial fan tool, not affiliated with Behaviour Interactive.
 With Ollama the program only talks to `127.0.0.1` (port configurable, default 11434). "Load local models" fills
 the list with your installed models.
 
-## Getting started
+## Installing
+
+**Easy:** download `FogTranslate-Setup-<version>.exe` from
+[Releases](https://github.com/sarujansa/fog-translate/releases/latest) and run it – no admin rights, no Python
+needed. The setup is not signed: Windows SmartScreen asks on the first start (More info → Run anyway). Updates:
+**Check for updates** shows a new version and opens the release page; the new setup installs over the old one,
+settings and keys stay.
+
+**From source:**
 
 1. Install Python 3.12–3.14 from python.org.
 2. Download this repository (green **Code** button → **Download ZIP**, or `git clone`) and double-click

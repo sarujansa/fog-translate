@@ -308,7 +308,7 @@ class MainWindow(QWidget):
         if c is not None and c.state == "newer":
             from PySide6.QtCore import QUrl
             from PySide6.QtGui import QDesktopServices
-            QDesktopServices.openUrl(QUrl(update.REPO_URL))
+            QDesktopServices.openUrl(QUrl(update.download_page()))
             return
         self.update_btn.setEnabled(False)
         self.update_btn.setText("Checking …")
