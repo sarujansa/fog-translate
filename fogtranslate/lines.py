@@ -55,6 +55,13 @@ def same_message(a: ChatLine, b: ChatLine) -> bool:
     return SequenceMatcher(None, x, y, autojunk=False).ratio() >= SIMILAR
 
 
+def _repeats(old: str, new: str) -> bool:
+    """``new`` contains ``old`` twice or more – the service read the message doubled (seen with a message whose
+    first line was cut off at the top: "what language … dbd chat around people write in dbd chat what …")."""
+    return len(old) >= MIN_PART and new.count(old) >= 2 or (
+        len(old) >= MIN_PART and len(new) > 1.6 * len(old) and new.count(old[: len(old) // 2]) >= 2)
+
+
 class Transcript:
     """All messages read so far, each once. A better reading of a message (longer: wrapped lines joined, less cut
     off) replaces the earlier one(s) in place instead of adding a duplicate."""
@@ -80,6 +87,8 @@ class Transcript:
                 added.append(line)
                 continue
             longest = max(hits, key=lambda i: len(normal(self.entries[i].text)))
+            if _repeats(normal(self.entries[longest].text), normal(line.text)):
+                continue                                    # a misreading that repeats the message
             if len(normal(line.text)) <= len(normal(self.entries[longest].text)) and len(hits) == 1:
                 continue                                    # nothing better than what is shown
             keep = line if len(normal(line.text)) >= len(normal(self.entries[longest].text)) else self.entries[longest]

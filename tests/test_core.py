@@ -433,3 +433,26 @@ def test_changing_text_is_sent_even_if_the_box_never_settles():
 def test_an_area_without_text_is_never_sent():
     g = ChangeGate(settle=1)
     assert not any(g.look(_lobby([], t)) for t in range(6))
+
+
+def test_earlier_translations_stay_on_screen_while_the_chat_is_active():
+    """Saru, 09.11.2026: Snoggles' Chinese lines were gone from the overlay when faery wrote 20 s later."""
+    eng, t = _engine(show_s=25.0, show_all=False)
+    eng.answer(Result([ChatLine("Snoggles", "被迫让一个天平", "zh", "Forced into a balance", True)], 0.0))
+    t[0] = 20.0
+    eng.answer(Result([ChatLine("Snoggles", "被迫让一个天平", "zh", "Forced into a balance", True),
+                       ChatLine("Meg", "привет", "ru", "hallo", True)], 0.0))
+    t[0] = 40.0                                      # 40 s after the Chinese line, 20 s after the last new one
+    assert [ln.sender for ln in eng.visible()] == ["Snoggles", "Meg"]
+    t[0] = 46.0                                      # nothing new for more than 25 s
+    assert eng.visible() == []
+    assert eng.last_counts == {"read": 2, "foreign": 2, "new": 1, "replaced": 0}
+
+
+def test_a_doubled_misreading_does_not_replace_the_message():
+    t = Transcript()
+    t.add([_line("Dwight", "what language do people write in dbd chat")])
+    added, replaced = t.add([_line("Dwight", "what language do people write in dbd chat around people write in "
+                                             "dbd chat what language do people write in dbd chat")])
+    assert not added and not replaced
+    assert t.entries[0].text == "what language do people write in dbd chat"

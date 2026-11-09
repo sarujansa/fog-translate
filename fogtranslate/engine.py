@@ -15,7 +15,7 @@ from .change import ChangeGate
 from .lines import ChatLine, Transcript
 from .translate import Result, TranslateError
 
-KEEP_SHOWN = 8
+KEEP_SHOWN = 6
 QUOTA_WAIT_S = 60.0              # after a "limit reached" answer, wait at least this long
 SERVICE_GAP_S = {"gemini": 6.5}  # Gemini's free tier allows about 10 requests a minute
 
@@ -45,6 +45,7 @@ class Engine:
         self._last_request = -1e9
         self._not_before = -1e9      # after a limit answer
         self._pending = None
+        self.last_counts = {}       # numbers of the last answer, for the log (never text)
         self.last_sent = None        # the last picture sent (in memory only) – "Letzten Ausschnitt zeigen"
 
     @_locked
@@ -111,6 +112,7 @@ class Engine:
         if isinstance(outcome, TranslateError):
             self.status = "error"
             self.error = outcome.kind
+            self.last_counts = {}
             if outcome.kind == "quota":
                 self._not_before = self.clock() + QUOTA_WAIT_S
             return False
@@ -119,6 +121,8 @@ class Engine:
         self.status = "watching"
         self.error = ""
         added, replaced = self.transcript.add(outcome.lines)
+        self.last_counts = {"read": len(outcome.lines), "foreign": sum(1 for ln in outcome.lines if ln.translate),
+                            "new": len(added), "replaced": len(replaced)}
         t = self.clock()
         for old_key, line in replaced.items():
             self.shown.pop(old_key, None)
@@ -137,8 +141,11 @@ class Engine:
 
     @_locked
     def visible(self) -> list[ChatLine]:
-        """Messages for the overlay: the newest ones that changed within ``show_s``."""
+        """Messages for the overlay: the latest ``KEEP_SHOWN`` translations, as long as something new came within
+        ``show_s`` – a running view of the chat, not just the last change (Saru, 09.11.2026: the Chinese lines
+        had faded already when the next English line arrived, so they looked untranslated)."""
         limit = self.clock() - float(self.settings["show_s"])
         self.shown = {k: t for k, t in self.shown.items() if t >= limit}
-        out = [ln for ln in self.transcript.entries if ln.key() in self.shown and self.wanted(ln)]
-        return out[-KEEP_SHOWN:]
+        if not self.shown:
+            return []
+        return [ln for ln in self.transcript.entries if self.wanted(ln)][-KEEP_SHOWN:]
