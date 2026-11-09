@@ -349,15 +349,34 @@ class MainWindow(QWidget):
 
     # ---------------------------------------------------------------- region
     def pick_region(self):
+        """Take a still picture of the game (with our own windows out of the way) and mark the chat on it."""
         game = window.find_game()
-        if game is not None and not game.minimized:
-            client = game.client
-        else:                                          # no DBD: mark on the primary screen (for testing)
-            g = QApplication.primaryScreen().geometry()
-            client = qtgeom.from_qt((g.x(), g.y(), g.width(), g.height()), qtgeom.ratio())
+        if game is None or game.minimized:
+            self.status.setText("Open Dead by Daylight first (not minimised), then mark the chat area.")
+            return
         self.overlay.hide()
-        self.picker = RegionPicker(client, self._picked, self.settings["region"])
-        self.picker.start()
+        self.hide()                                    # our window must not be in the picture
+        QTimer.singleShot(350, lambda: self._open_picker(game))
+
+    def _open_picker(self, game):
+        picture = None
+        try:
+            from .grab import Grabber
+            grabber = Grabber()
+            try:
+                picture = grabber.grab(game.client)
+            finally:
+                grabber.close()
+        except Exception:
+            log.exception("Screenshot for marking failed")
+        self.show()
+        if picture is None:
+            self.status.setText("Could not take a picture of the game (see log).")
+            return
+        log.info("Marking on a picture of %d x %d", picture.shape[1], picture.shape[0])
+        self.picker = RegionPicker(picture, self._picked, self.settings["region"])
+        screen = QApplication.primaryScreen().availableGeometry()
+        self.picker.start((screen.width(), screen.height()))
 
     def _picked(self, rel):
         self.picker = None
