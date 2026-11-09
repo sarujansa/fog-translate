@@ -244,3 +244,53 @@ def test_after_a_limit_answer_and_for_gemini_the_requests_wait_longer():
     t[0] = 61.0
     eng.look(GAME, True, grab)
     assert len(eng.worker.sent) == 2
+
+
+# ---------------------------------------------------------------- look thread
+def test_the_look_thread_builds_the_translator_and_looks_without_the_window():
+    import queue
+    import time as _time
+    from fogtranslate.looper import Looper
+
+    eng, _ = _engine()
+    q = queue.Queue()
+
+    class Grabber:
+        def grab(self, box):
+            return _chat(1)
+
+        def close(self):
+            pass
+
+    def slow_make():
+        _time.sleep(0.2)                          # like importing the SDK
+        return object()
+
+    loop = Looper(eng, slow_make, q.put, 0.2, grabber_factory=Grabber, find_game=lambda: GAME,
+                  in_front=lambda g: True)
+    started = _time.monotonic()
+    loop.start()
+    assert _time.monotonic() - started < 0.1     # start() does not wait for the translator
+    kinds = []
+    while "tick" not in kinds and _time.monotonic() - started < 5:
+        kinds.append(q.get(timeout=5)[0])
+    loop.stop()
+    loop.join(2)
+    assert kinds[0] == "started" and not loop.is_alive()
+
+
+def test_a_failing_start_is_reported_not_raised():
+    import queue
+    from fogtranslate.looper import Looper
+
+    eng, _ = _engine()
+    q = queue.Queue()
+
+    def no_key():
+        raise TranslateError("key")
+
+    loop = Looper(eng, no_key, q.put, 0.2)
+    loop.start()
+    loop.join(2)
+    kind, err = q.get(timeout=1)
+    assert kind == "start_failed" and err.kind == "key"

@@ -22,8 +22,6 @@ if IS_WIN:
     user32.IsWindowVisible.restype = wintypes.BOOL
     user32.IsIconic.argtypes = [wintypes.HWND]
     user32.IsIconic.restype = wintypes.BOOL
-    user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
-    user32.GetWindowTextLengthW.restype = ctypes.c_int
     user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
     user32.GetWindowTextW.restype = ctypes.c_int
     user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
@@ -47,9 +45,10 @@ class GameWindow:
 
 
 def _text(hwnd) -> str:
-    n = user32.GetWindowTextLengthW(hwnd)
-    buf = ctypes.create_unicode_buffer(n + 1)
-    user32.GetWindowTextW(hwnd, buf, n + 1)
+    """The title with a fixed buffer and no length query first (that query may send the window a message, and a
+    busy window could then block us). GetWindowText reads another process's caption without a message."""
+    buf = ctypes.create_unicode_buffer(256)
+    user32.GetWindowTextW(hwnd, buf, 256)
     return buf.value
 
 

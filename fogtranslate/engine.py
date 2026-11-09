@@ -5,6 +5,8 @@ one request at a time, at least ``min_gap_s`` apart, at most ``daily_cap`` a day
 """
 from __future__ import annotations
 
+import functools
+import threading
 import time
 from datetime import datetime
 
@@ -18,8 +20,19 @@ QUOTA_WAIT_S = 60.0              # after a "limit reached" answer, wait at least
 SERVICE_GAP_S = {"gemini": 6.5}  # Gemini's free tier allows about 10 requests a minute
 
 
+def _locked(fn):
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        with self.lock:
+            return fn(self, *args, **kwargs)
+    return wrapper
+
+
 class Engine:
+    """Used from two threads: the look thread (``look``) and the window (``answer``, ``visible``) – one lock."""
+
     def __init__(self, settings, worker, clock=time.monotonic, now=datetime.now):
+        self.lock = threading.RLock()
         self.settings = settings
         self.worker = worker
         self.clock = clock
@@ -32,7 +45,9 @@ class Engine:
         self._last_request = -1e9
         self._not_before = -1e9      # after a limit answer
         self._pending = None
+        self.last_sent = None        # the last picture sent (in memory only) – "Letzten Ausschnitt zeigen"
 
+    @_locked
     def region_on_screen(self, game) -> tuple[int, int, int, int] | None:
         rel = self.settings["region"]
         if game is None or rel is None:
@@ -41,6 +56,7 @@ class Engine:
         x, y, w, h = geometry.from_relative(rel, geometry.viewport(cw, ch))
         return cx + x, cy + y, w, h
 
+    @_locked
     def look(self, game, in_front: bool, grab) -> None:
         """One tick. ``grab(box)`` returns the BGR picture of a screen box."""
         if self.settings["region"] is None:
@@ -77,10 +93,12 @@ class Engine:
             self._pending = None
             return
         if self.worker.submit(self._pending):
+            self.last_sent = self._pending
             self._last_request = t
             self._pending = None
             self.status = "asking"
 
+    @_locked
     def answer(self, outcome) -> list[ChatLine]:
         """A finished request (in the Qt thread). Returns the newly shown lines."""
         n = self.now()
@@ -102,6 +120,7 @@ class Engine:
         self.shown = self.shown[-KEEP_SHOWN:]
         return new
 
+    @_locked
     def visible(self) -> list[ChatLine]:
         """Lines still on screen (newer than ``show_s``)."""
         limit = self.clock() - float(self.settings["show_s"])
