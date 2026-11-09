@@ -64,3 +64,15 @@ Knopf **Check for updates** unten rechts – das Programm fragt GitHub nur auf d
 ## Einstellungen
 
 `%LOCALAPPDATA%\FogTranslate\settings.json` (Log: `fogtranslate.log` daneben).
+
+## Lizenz / License
+
+Nutzen und **unverändert** weitergeben ist erlaubt (am besten den Link zu diesem Repository teilen).
+**Bearbeiten, Verändern und das Veröffentlichen veränderter Fassungen nur mit meiner schriftlichen Erlaubnis** –
+frag einfach per GitHub-Issue. Inoffizielles Fan-Tool, Nutzung auf eigene Gefahr. Details: [LICENSE](LICENSE),
+Bibliotheken: [THIRD_PARTY.md](THIRD_PARTY.md).
+
+Use and sharing the **unmodified** program is allowed (best: share the link to this repository). **Modifying it or
+publishing modified versions requires my written permission** – just ask in a GitHub issue. Unofficial fan tool,
+use at your own risk. Details: [LICENSE](LICENSE), libraries: [THIRD_PARTY.md](THIRD_PARTY.md).
+
