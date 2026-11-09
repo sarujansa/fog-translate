@@ -1,12 +1,11 @@
-"""Claude reads the chat picture and translates it – one request per settled change of the region.
+"""What every translation service shares: the instruction, the answer format, parsing and the request thread.
 
-Sent: the picture of the marked region only (PNG in memory, never a file), the target language and a fixed
-instruction. The picture can show player names – that is said in the UI before the user turns it on.
-Answer: structured JSON (``SCHEMA``), turned into ``ChatLine``s; Claude's texts are only ever shown as plain text.
+A service (``claude``, ``gemini``, ``ollama``) reads the chat picture and translates it in one step. Sent: the
+picture of the marked region only (PNG in memory, never a file), the target language and the fixed instruction
+``SYSTEM``. Answer: JSON in the form ``SCHEMA``, turned into ``ChatLine``s; answers are only shown as plain text.
 """
 from __future__ import annotations
 
-import base64
 import io
 import logging
 import threading
@@ -16,19 +15,10 @@ from .lines import ChatLine
 
 log = logging.getLogger(__name__)
 
-MODELS = {                       # id → (label, $ per 1M input, $ per 1M output)
-    "claude-opus-5-5": ("Claude Opus 5.5 (beste Qualität)", 4.00, 20.00),
-    "claude-sonnet-5-5": ("Claude Sonnet 5.5", 2.00, 10.00),
-    "claude-haiku-5-5": ("Claude Haiku 5.5 (am günstigsten)", 0.10, 0.50),
-}
-DEFAULT_MODEL = "claude-opus-5-5"
-FALLBACK_BETA = "server-side-fallback-2026-07-01"
-FALLBACK_MODELS = ("claude-opus-5-5", "claude-sonnet-5-5")   # models that take the server-side fallbacks
 MAX_SIDE = 1568                  # longest side of the picture sent
-MAX_TOKENS = 4096
 MAX_LINES = 30
+MAX_TOKENS_DEFAULT = 4096
 MAX_FIELD = 500
-TIMEOUT_S = 60.0
 
 LANGUAGES = {"de": "German", "en": "English", "fr": "French", "es": "Spanish", "it": "Italian",
              "pt": "Portuguese", "pl": "Polish", "ru": "Russian", "tr": "Turkish", "nl": "Dutch"}
@@ -69,7 +59,8 @@ SCHEMA = {
 
 
 class TranslateError(Exception):
-    """kind: key (no/invalid key), quota (rate limit or no credit), net (connection), refused, answer, other."""
+    """kind: key (no/invalid key), quota (rate limit or no credit), net (connection), refused, answer,
+    model (unknown model), server (local service not running), other."""
 
     def __init__(self, kind: str, detail: str = ""):
         super().__init__(kind)
@@ -121,73 +112,24 @@ def parse(data) -> list[ChatLine]:
     return out
 
 
-def cost_usd(model: str, usage) -> float:
-    _, p_in, p_out = MODELS.get(model, MODELS[DEFAULT_MODEL])
-    n_in = (getattr(usage, "input_tokens", 0) or 0) + (getattr(usage, "cache_creation_input_tokens", 0) or 0) * 1.25
-    n_in += (getattr(usage, "cache_read_input_tokens", 0) or 0) * 0.1
-    return (n_in * p_in + (getattr(usage, "output_tokens", 0) or 0) * p_out) / 1_000_000
+def instruction(target: str) -> str:
+    return "Target language: " + LANGUAGES.get(target, "German") + "."
 
 
-class Translator:
-    """One request at a time; ``client`` is injectable for tests (anything with ``beta.messages.create``)."""
-
-    def __init__(self, api_key: str, model: str = DEFAULT_MODEL, target: str = "de", client=None):
-        self.model = model if model in MODELS else DEFAULT_MODEL
-        self.target = target if target in LANGUAGES else "de"
-        if client is None:
-            import anthropic
-            client = anthropic.Anthropic(api_key=api_key, timeout=TIMEOUT_S, max_retries=1)
-        self._client = client
-
-    def request(self, img) -> Result:
-        import json
-        picture = base64.standard_b64encode(png_bytes(img)).decode("ascii")
-        kwargs = dict(
-            model=self.model,
-            max_tokens=MAX_TOKENS,
-            system=[{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": picture}},
-                {"type": "text", "text": "Target language: " + LANGUAGES[self.target] + "."},
-            ]}],
-            output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
-        )
-        if self.model in FALLBACK_MODELS:
-            kwargs.update(betas=[FALLBACK_BETA], fallbacks="default")
-        try:
-            response = self._client.beta.messages.create(**kwargs)
-        except Exception as e:                       # mapped to a kind; the key never reaches the log
-            raise _error(e) from None
-        if getattr(response, "stop_reason", None) == "refusal":
-            raise TranslateError("refused")
-        text = next((b.text for b in response.content if getattr(b, "type", "") == "text"), "")
-        try:
-            data = json.loads(text)
-        except ValueError:
-            raise TranslateError("answer") from None
-        return Result(parse(data), cost_usd(self.model, getattr(response, "usage", None)))
-
-
-def _error(e: Exception) -> TranslateError:
+def answer_lines(text: str) -> list[ChatLine]:
+    """The JSON text of an answer → ChatLines; not JSON → TranslateError("answer")."""
+    import json
     try:
-        import anthropic
-    except ImportError:                              # pragma: no cover
-        return TranslateError("other", type(e).__name__)
-    if isinstance(e, (anthropic.AuthenticationError, anthropic.PermissionDeniedError)):
-        return TranslateError("key", type(e).__name__)
-    if isinstance(e, anthropic.RateLimitError):
-        return TranslateError("quota", type(e).__name__)
-    if isinstance(e, anthropic.APIConnectionError):
-        return TranslateError("net", type(e).__name__)
-    if isinstance(e, anthropic.BadRequestError) and "credit" in str(e).lower():
-        return TranslateError("quota", "credit")
-    return TranslateError("other", type(e).__name__)
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        raise TranslateError("answer") from None
+    return parse(data)
 
 
 class Worker:
     """Runs one request in a thread; ``done(result_or_error)`` is called in that thread."""
 
-    def __init__(self, translator: Translator, done):
+    def __init__(self, translator, done):
         self.translator = translator
         self._done = done
         self._busy = threading.Lock()

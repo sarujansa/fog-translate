@@ -27,11 +27,23 @@ def test_no_input_or_process_apis():
             assert not re.search(r"\b" + word + r"\b", text), (name, word)
 
 
-def test_only_the_translator_talks_to_the_internet():
+NETWORK = {"claude.py", "gemini.py", "ollama.py", "http.py"}     # the services and their HTTP helper only
+
+
+def test_only_the_services_talk_to_the_network():
     for name, text in _sources():
-        if name == "translate.py":
+        if name in NETWORK:
             continue
         assert not re.search(r"^\s*(import|from)\s+(anthropic|urllib|http|socket|requests)\b", text, re.M), name
+        assert not re.search(r"^\s*from\s+\.\s+import\s+.*\bhttp\b", text, re.M), name
+
+
+def test_each_service_reaches_only_its_own_host():
+    import fogtranslate.gemini as gemini
+    import fogtranslate.ollama as ollama
+    assert gemini.HOST == "https://generativelanguage.googleapis.com"
+    assert ollama.HOST == "127.0.0.1"
+    assert ollama.base_url(99999) == "http://127.0.0.1:11434"
 
 
 def test_the_key_never_goes_to_the_log():

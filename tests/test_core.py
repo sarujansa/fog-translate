@@ -10,7 +10,8 @@ from fogtranslate.change import ChangeGate
 from fogtranslate.config import Settings
 from fogtranslate.engine import Engine
 from fogtranslate.lines import ChatLine, SeenLines
-from fogtranslate.translate import SCHEMA, Result, TranslateError, Translator, parse
+from fogtranslate.claude import Translator
+from fogtranslate.translate import SCHEMA, Result, TranslateError, parse
 
 
 # ---------------------------------------------------------------- geometry
@@ -206,10 +207,10 @@ def test_the_region_follows_the_game_window():
 # ---------------------------------------------------------------- settings + key
 def test_the_key_is_never_stored_in_clear_text(tmp_path):
     s = Settings(str(tmp_path))
-    assert s.set_api_key("sk-ant-secret") is (secret.CIPHER is not None)
+    assert s.set_api_key("claude", "sk-ant-secret") is (secret.CIPHER is not None)
     s.save()
     assert "sk-ant-secret" not in (tmp_path / "settings.json").read_text(encoding="utf-8")
-    assert s.api_key() == "sk-ant-secret"
+    assert s.api_key("claude") == "sk-ant-secret"
 
 
 def test_dpapi_round_trip_with_a_stand_in_cipher():
@@ -220,7 +221,26 @@ def test_dpapi_round_trip_with_a_stand_in_cipher():
 
 
 def test_broken_settings_fall_back_to_defaults(tmp_path):
-    (tmp_path / "settings.json").write_text('{"region": [5, 5, 0, 0], "target": "xx", "model": "gpt"}',
+    (tmp_path / "settings.json").write_text('{"region": [5, 5, 0, 0], "target": "xx", "model": "gpt", '
+                                            '"service": "x", "ollama_port": 0, "accepted": ["x", "gemini"]}',
                                             encoding="utf-8")
     s = Settings(str(tmp_path))
-    assert s["region"] is None and s["target"] == "de" and s["model"] == "claude-opus-5-5"
+    assert s["region"] is None and s["target"] == "de" and s["claude_model"] == "claude-opus-5-5"
+    assert s["service"] == "claude" and s["ollama_port"] == 11434 and s["accepted"] == ["gemini"]
+
+
+def test_after_a_limit_answer_and_for_gemini_the_requests_wait_longer():
+    eng, t = _engine(min_gap_s=3.0, service="gemini")
+    frames = iter([_chat(1), _chat(1), _chat(2), _chat(2), _chat(2)])
+    grab = lambda box: next(frames)
+    eng.look(GAME, True, grab)
+    eng.look(GAME, True, grab)
+    assert len(eng.worker.sent) == 1
+    eng.answer(TranslateError("quota"))
+    t[0] = 30.0
+    eng.look(GAME, True, grab)
+    eng.look(GAME, True, grab)
+    assert len(eng.worker.sent) == 1          # still waiting after the limit
+    t[0] = 61.0
+    eng.look(GAME, True, grab)
+    assert len(eng.worker.sent) == 2

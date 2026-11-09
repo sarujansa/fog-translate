@@ -1,8 +1,8 @@
 # Fog Translate
 
 Live-Übersetzung des **Dead by Daylight**-Chats. Du markierst einmal den Chat-Bereich; sobald dort neue Zeilen
-stehen, liest Claude sie (jede Schrift: Kyrillisch, Koreanisch, Japanisch, Chinesisch, Latein mit Akzenten …),
-erkennt die Sprache und übersetzt sie. Die Übersetzung erscheint in einem kleinen, klickdurchlässigen Fenster
+stehen, liest ein KI-Modell sie (jede Schrift: Kyrillisch, Koreanisch, Japanisch, Chinesisch, Latein mit
+Akzenten …), erkennt die Sprache und übersetzt sie. Die Übersetzung erscheint in einem kleinen, klickdurchlässigen Fenster
 direkt über dem Chat.
 
 Eigenständiges Programm, unabhängig von [Fog Scout](https://github.com/sarujansa/fog-scout) – beide laufen
@@ -16,25 +16,32 @@ nebeneinander.
   Chat.
 - Das Übersetzungsfenster ist von Bildschirmaufnahmen ausgenommen – es taucht nicht in OBS-Aufnahmen, Screenshots
   oder in der Erkennung von Fog Scout auf.
-- **Internet:** nur zu Anthropic (`api.anthropic.com`), mit deinem eigenen API-Key. Gesendet wird das Bild des
-  markierten Bereichs – **es kann Spielernamen zeigen** – und die Zielsprache. Nur wenn sich dort etwas geändert
-  hat, höchstens alle 3 s, höchstens 300 Anfragen am Tag (einstellbar in `settings.json`).
-- Der API-Key wird mit Windows-DPAPI verschlüsselt gespeichert, nie im Klartext und nie im Log.
+- **Internet:** nur zum gewählten Dienst (siehe unten). Gesendet wird das Bild des markierten Bereichs – **es kann
+  Spielernamen und Nachrichten anderer Spieler zeigen** – und die Zielsprache. Nur wenn sich dort etwas geändert
+  hat, höchstens alle 3 s (Gemini: 6,5 s), höchstens 300 Anfragen am Tag (einstellbar in `settings.json`).
+- API-Keys werden mit Windows-DPAPI verschlüsselt gespeichert, nie im Klartext und nie im Log.
+
+## Dienste
+
+| Dienst | Was du brauchst | Kosten | Daten |
+|---|---|---|---|
+| **Claude** (Anthropic) | API-Key von https://console.anthropic.com | je Anfrage grob 0,5–1 Cent (Opus), Haiku ein Bruchteil | gehen an Anthropic |
+| **Gemini** (Google) | kostenloser API-Key von https://aistudio.google.com/apikey | kostenlose Stufe (ca. 10 Anfragen/min, Tageskontingent) | gehen an Google; in der kostenlosen Stufe darf Google sie zur Produktverbesserung nutzen |
+| **Ollama** (lokal) | [Ollama](https://ollama.com) + Bildmodell, z. B. `ollama pull qwen2.5vl:7b` (≈ 6 GB, Grafikkarte ≥ 8 GB) oder `gemma3:4b` | gratis | bleiben auf dem PC |
+
+Bei Ollama spricht das Programm nur mit `127.0.0.1` (Port einstellbar, Standard 11434). „Lokale Modelle laden“
+füllt die Liste mit den installierten Modellen.
 
 ## Starten
 
 1. Python 3.12–3.14 von python.org installieren.
 2. `start.bat` doppelklicken (beim ersten Mal werden die Pakete installiert, alle Versionen fest und per SHA-256
    geprüft).
-3. API-Key von https://console.anthropic.com eintragen, Hinweis bestätigen.
+3. Dienst wählen, API-Key eintragen (nicht bei Ollama), Hinweis bestätigen.
 4. DBD öffnen, **Chat-Bereich markieren** (Rahmen um den Chat aufziehen, Esc bricht ab), **Starten**.
 
-Test ohne Spiel: `.venv\Scripts\python -m fogtranslate --test chat.png` übersetzt einen Bildausschnitt einmal.
-
-## Kosten
-
-Je Anfrage ein Bild des Chat-Bereichs + kurze Antwort. Mit Claude Opus 5.5 grob 0,5–1 Cent, mit Claude Haiku 5.5
-ein Bruchteil davon. Das Fenster zeigt die geschätzte Summe des Monats.
+Test ohne Spiel: `.venv\Scripts\python -m fogtranslate --test chat.png [--service gemini]` übersetzt einen
+Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_API_KEY`.
 
 ## Einstellungen
 
