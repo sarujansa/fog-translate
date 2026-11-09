@@ -2,6 +2,8 @@
 
 # Fog Translate
 
+*English: [README.en.md](README.en.md)*
+
 Live-Übersetzung des **Dead by Daylight**-Chats. Du markierst einmal den Chat-Bereich; sobald dort neue Zeilen
 stehen, liest ein KI-Modell sie (jede Schrift: Kyrillisch, Koreanisch, Japanisch, Chinesisch, Latein mit
 Akzenten …), erkennt die Sprache und übersetzt sie. Die Übersetzung erscheint in einem kleinen, klickdurchlässigen Fenster
@@ -9,6 +11,20 @@ direkt über dem Chat.
 
 Eigenständiges Programm, unabhängig von [Fog Scout](https://github.com/sarujansa/fog-scout) – beide laufen
 nebeneinander.
+
+## So funktioniert es
+
+1. **Mark chat area** macht ein Standbild des DBD-Fensters; du ziehst einen Rahmen um den Chat und klickst **Save**.
+   Der Bereich wird relativ zum Spielfenster gespeichert und passt auch bei anderer Fenstergröße.
+2. Nach **Start** schaut das Programm etwa einmal pro Sekunde auf diesen Bereich (nur Bildschirmpixel).
+3. Verglichen wird nur die **Schrift** im Bereich (helle, scharfe Striche auf dem dunklen Chat-Feld) – die bewegte
+   Lobby dahinter zählt nicht. Hat sich die Schrift geändert, geht das Bild des Bereichs an den gewählten Dienst –
+   höchstens alle 3 s (Gemini: 6,5 s), höchstens 300-mal am Tag.
+4. Der Dienst liest jede Nachricht, fügt umgebrochene Zeilen zusammen, erkennt die Sprache und übersetzt in deine
+   Zielsprache; zurück kommen Name, Original, Sprache und Übersetzung.
+5. Schon gezeigte Nachrichten werden erkannt und nicht doppelt gezeigt; eine bessere Lesung ersetzt die alte.
+6. Fremdsprachige Nachrichten erscheinen im Overlay über dem Chat (Sprache, Name, Übersetzung, Original klein) und
+   in der Liste im Hauptfenster. Das Overlay blendet nach 25 s ohne Neues aus.
 
 ## Was das Programm tut – und was nicht
 
@@ -29,7 +45,7 @@ nebeneinander.
 | Dienst | Was du brauchst | Kosten | Daten |
 |---|---|---|---|
 | **Claude** (Anthropic) | API-Key von https://console.anthropic.com | je Anfrage grob 0,5–1 Cent (Opus), Haiku ein Bruchteil | gehen an Anthropic |
-| **Gemini** (Google) | kostenloser API-Key von https://aistudio.google.com/apikey | kostenlose Stufe (ca. 10 Anfragen/min, Tageskontingent) | gehen an Google; in der kostenlosen Stufe darf Google sie zur Produktverbesserung nutzen |
+| **Gemini** (Google) | kostenloser API-Key von https://aistudio.google.com/apikey | kostenlose Stufe (ca. 10 Anfragen/min, Tageskontingent; Verfügbarkeit je nach Region) | gehen an Google; in der kostenlosen Stufe darf Google sie zur Produktverbesserung nutzen |
 | **Ollama** (lokal) | [Ollama](https://ollama.com) + Bildmodell, z. B. `ollama pull qwen2.5vl:7b` (≈ 6 GB, Grafikkarte ≥ 8 GB) oder `gemma3:4b` | gratis | bleiben auf dem PC |
 
 Bei Ollama spricht das Programm nur mit `127.0.0.1` (Port einstellbar, Standard 11434). „Load local models“
