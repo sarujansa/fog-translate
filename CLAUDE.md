@@ -42,8 +42,10 @@ Code und Kommentare Englisch.
 Samsung G5 3440×1440, DBD (Steam/Epic/MS Store) im Fenster-Vollbild, rendert 16:9 = 2560×1440 zentriert (Balken je
 440 px). Bereiche daher relativ zum 16:9-Viewport (`geometry.viewport`). Win32 und mss rechnen in
 physischen Pixeln, Qt bei Windows-Skalierung > 100 % in logischen (physisch / Faktor): **jede** Stelle, an der ein
-Bildschirm-Rechteck ein Qt-Fenster trifft, rechnet über `qtgeom` (`ratio`, `to_qt`, `from_qt`) – Markieren, Overlay,
-Bildschirmfläche (Sarus Test 09.11.2026: abgeschnittene Zeilen). `QT_ENABLE_HIGHDPI_SCALING=0` bleibt zusätzlich.
+Bildschirm-Rechteck ein Qt-Fenster trifft, rechnet über `qtgeom` (`ratio`, `to_qt`, `from_qt`) – Overlay, Bildschirmfläche
+(Sarus Test 09.11.2026: abgeschnittene Zeilen). Markiert wird seit 0.7 auf einem **Standbild** des Spielfensters in
+einem normalen Fenster (`picker.RegionPicker`): Bildpixel = Bildschirmpixel, kein Fenster über dem Spiel (über DBD
+kamen die Klicks beim Nutzer nicht an). `QT_ENABLE_HIGHDPI_SCALING=0` bleibt zusätzlich.
 
 ## Architektur (fogtranslate/)
 
@@ -60,7 +62,7 @@ Bildschirmfläche (Sarus Test 09.11.2026: abgeschnittene Zeilen). `QT_ENABLE_HIG
 | `update.py`, `deps.py` | Update auf Klick (`check` → `Check.state` current/behind/ahead/dirty/branch/newer/error, `apply` = `merge --ff-only`, `restart`), Pakete nach Update (`needed`, `main`, nur Standardbibliothek) |
 | `qtgeom.py` | Physische ↔ Qt-Pixel (`ratio` = devicePixelRatio des Hauptbildschirms) |
 | `icon.py` | Logo per QPainter (zwei Sprechblasen + Nebel, `paint`/`pixmap`/`icon`, `SIZES`), `set_app_id` (eigenes Taskleisten-Symbol); `assets/logo.png` erzeugt `tools/export_logo.py` – nach Änderungen an der Zeichnung neu erzeugen |
-| `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig, von Aufnahmen ausgenommen; je Nachricht Kopfzeile Sprache + Name, Übersetzung, Original klein; Messen und Zeichnen über dieselben `rows`/`_height`), Verlauf `history_html` (alles escaped), Bereich markieren, Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads), Start/`--test`; `__main__._log_setup`: Log, unbehandelte Fehler aller Threads ins Log, `faulthandler` → `crash.txt` |
+| `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig; je Nachricht Kopfzeile Sprache + Name, Übersetzung, Original klein; Messen und Zeichnen über dieselben `rows`/`_height`), Verlauf `history_html` (alles escaped), Bereich markieren (`app.pick_region`: eigene Fenster weg, nach 350 ms ein mss-Bild des Spielfensters → `RegionPicker(picture, done, current)` mit `Canvas` in Bildpixeln, Save/Cancel/Esc/Enter/×), Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads), Start/`--test`; `__main__._log_setup`: Log, unbehandelte Fehler aller Threads ins Log, `faulthandler` → `crash.txt` |
 
 ## Starten, Testen
 

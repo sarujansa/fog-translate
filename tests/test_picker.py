@@ -7,6 +7,8 @@ from PySide6.QtCore import QPoint, Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
+import numpy as np  # noqa: E402
+
 from fogtranslate import geometry  # noqa: E402
 from fogtranslate.picker import RegionPicker  # noqa: E402
 
@@ -22,45 +24,56 @@ def _drag(w, a, b):
     QTest.mouseRelease(w, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(*b))
 
 
-def test_a_new_box_replaces_the_old_one_even_when_started_inside_it(app):
+def _picture(w=3440, h=1440):
+    return np.zeros((h, w, 3), np.uint8)
+
+
+def test_the_box_is_marked_in_picture_pixels_even_when_the_picture_is_shown_smaller(app):
+    """Saru's screen: 3440 × 1440 picture shown at a quarter size – the saved area is the dragged part of the
+    picture, i.e. of the screen."""
     got = []
-    old = (0.02, 0.6, 0.08, 0.2)                       # Saru's narrow box
-    picker = RegionPicker((0, 0, 1920, 1080), got.append, old)
-    picker.start()
-    ox, oy, ow, oh = geometry.from_relative(old, picker.view)
-    _drag(picker, (ox + 10, oy + 10), (ox + 600, oy + 300))   # starts inside the old box
-    assert len(got) == 1 and got[0][2] > old[2] * 3
-    assert not picker.isVisible()
-
-
-def test_no_pixel_of_the_picker_is_fully_transparent(app):
-    picker = RegionPicker((0, 0, 400, 300), lambda rel: None, (0.1, 0.1, 0.5, 0.5))
-    picker.resize(400, 300)
-    img = picker.grab().toImage()
-    for x, y in ((5, 5), (200, 150), (100, 100), (395, 295)):
-        assert img.pixelColor(x, y).alpha() > 0, (x, y)
-
-
-def test_escape_cancels(app):
-    got = []
-    picker = RegionPicker((0, 0, 800, 600), got.append)
-    picker.start()
-    QTest.keyClick(picker, Qt.Key.Key_Escape)
-    assert got == [None]
-
-
-def test_with_display_scaling_the_marked_area_is_returned_in_screen_pixels(app):
-    """Windows at 125 %: Qt pixels = screen pixels / 1.25. The marked box must come back as the same part of the
-    game picture, not shrunk towards the top left (Saru's cut-off lines)."""
-    got = []
-    client = (0, 0, 3440, 1440)                         # Saru's screen, physical
-    picker = RegionPicker(client, got.append, scale=1.25)
-    assert (picker.width(), picker.height()) == (2752, 1152)
-    picker.start()
-    # in Qt pixels: 400..880 × 800..1040  →  physical 500..1100 × 1000..1300
-    _drag(picker, (400, 800), (880, 1040))
+    picker = RegionPicker(_picture(), got.append)
+    picker.canvas.resize(860, 360)                     # exactly 1/4
+    assert not picker.save_btn.isEnabled()
+    _drag(picker.canvas, (125, 250), (275, 325))       # picture 500..1100 × 1000..1300
+    assert picker.save_btn.isEnabled()
+    picker.save()
     view = geometry.viewport(3440, 1440)
     assert geometry.from_relative(got[0], view) == (500, 1000, 600, 300)
+
+
+def test_marking_again_replaces_the_old_box_wherever_the_new_one_starts(app):
+    got = []
+    old = (0.02, 0.6, 0.08, 0.2)
+    picker = RegionPicker(_picture(1920, 1080), got.append, old)
+    picker.canvas.resize(1920, 1080)
+    ox, oy, _, _ = geometry.from_relative(old, picker.view)
+    _drag(picker.canvas, (ox + 10, oy + 10), (ox + 600, oy + 300))
+    QTest.keyClick(picker, Qt.Key.Key_Return)
+    assert len(got) == 1 and got[0][2] > old[2] * 3
+
+
+def test_cancel_escape_and_closing_return_nothing_once(app):
+    for how in ("cancel", "esc", "close"):
+        got = []
+        picker = RegionPicker(_picture(800, 450), got.append, (0.1, 0.1, 0.3, 0.3))
+        picker.show()
+        if how == "cancel":
+            picker.cancel()
+        elif how == "esc":
+            QTest.keyClick(picker, Qt.Key.Key_Escape)
+        else:
+            picker.close()
+        assert got == [None], how
+
+
+def test_marking_needs_the_game_window(app):
+    from fogtranslate.app import MainWindow
+    from fogtranslate.config import Settings
+    win = MainWindow(Settings())
+    win.pick_region()                                  # no DBD here
+    assert "Open Dead by Daylight" in win.status.text() and win.picker is None
+    win.close()
 
 
 def test_the_overlay_is_placed_and_blacked_out_in_screen_pixels(app, monkeypatch):
@@ -81,3 +94,33 @@ def test_the_overlay_is_placed_and_blacked_out_in_screen_pixels(app, monkeypatch
     assert (o.x(), o.y()) == (800, 400)
     assert o.rect_on_screen == (1000, 500, round(w * 1.25), round(h * 1.25))
     o.close()
+
+
+def test_the_picker_opens_on_a_picture_of_the_game_window(app, monkeypatch):
+    from types import SimpleNamespace
+    from fogtranslate import grab
+    from fogtranslate.app import MainWindow
+    from fogtranslate.config import Settings
+
+    boxes = []
+
+    class FakeGrabber:
+        def grab(self, box):
+            boxes.append(box)
+            return _picture(box[2], box[3])
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(grab, "Grabber", FakeGrabber)
+    win = MainWindow(Settings())
+    win._open_picker(SimpleNamespace(client=(100, 50, 3440, 1440), minimized=False))
+    assert boxes == [(100, 50, 3440, 1440)]
+    assert (win.picker.canvas.pic_w, win.picker.canvas.pic_h) == (3440, 1440)
+    picker = win.picker
+    from PySide6.QtCore import QRect
+    picker.canvas.box = QRect(500, 1000, 600, 300)
+    picker.save()
+    assert geometry.from_relative(win.settings["region"], geometry.viewport(3440, 1440)) == (500, 1000, 600, 300)
+    assert win.picker is None
+    win.close()
