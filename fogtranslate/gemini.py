@@ -13,9 +13,9 @@ from .translate import SCHEMA, SYSTEM, Result, TranslateError, answer_lines, ins
 NAME = "gemini"
 HOST = "https://generativelanguage.googleapis.com"
 MODELS = {
-    "gemini-flash-latest": "Gemini Flash (empfohlen)",
-    "gemini-flash-lite-latest": "Gemini Flash-Lite (schneller, schwächer)",
-    "gemini-pro-latest": "Gemini Pro (beste Qualität, knappes Gratis-Kontingent)",
+    "gemini-flash-latest": "Gemini Flash (recommended)",
+    "gemini-flash-lite-latest": "Gemini Flash-Lite (faster, weaker)",
+    "gemini-pro-latest": "Gemini Pro (best quality, small free quota)",
 }
 DEFAULT_MODEL = "gemini-flash-latest"
 TIMEOUT_S = 60.0

@@ -34,7 +34,24 @@ if IS_WIN:
     user32.GetForegroundWindow.restype = wintypes.HWND
     user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
     user32.GetAncestor.restype = wintypes.HWND
+    user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+    user32.GetWindow.restype = wintypes.HWND
+    user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.GetWindowLongW.restype = ctypes.c_long
+    user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+    user32.GetWindowRect.restype = wintypes.BOOL
+    dwmapi = ctypes.WinDLL("dwmapi")
+    dwmapi.DwmGetWindowAttribute.argtypes = [wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD]
+    dwmapi.DwmGetWindowAttribute.restype = ctypes.c_long
     GA_ROOT = 2
+    GW_HWNDPREV = 3
+    GWL_EXSTYLE = -20
+    WS_EX_TRANSPARENT, WS_EX_LAYERED = 0x20, 0x80000
+    DWMWA_EXTENDED_FRAME_BOUNDS = 9
+    DWMWA_CLOAKED = 14
+
+# the taskbar is a strip at the screen edge, shown even over a full-screen game – it never hides the chat
+NOT_COVERING = ("Shell_TrayWnd", "Shell_SecondaryTrayWnd")
 
 
 @dataclass(frozen=True)
@@ -106,3 +123,56 @@ def game_in_front(game: GameWindow | None) -> bool:
     fg = user32.GetForegroundWindow()
     root = user32.GetAncestor(fg, GA_ROOT) if fg else None
     return bool(root) and int(root) == game.hwnd
+
+
+# ------------------------------------------------------------------ is the chat region hidden?
+def _cloaked(hwnd) -> bool:
+    """"Visible" but not drawn (other virtual desktop, suspended store app)."""
+    v = ctypes.c_int(0)
+    return dwmapi.DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, ctypes.byref(v), ctypes.sizeof(v)) == 0 and v.value != 0
+
+
+def _rect(hwnd):
+    rc = wintypes.RECT()
+    if dwmapi.DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, ctypes.byref(rc), ctypes.sizeof(rc)) != 0:
+        if not user32.GetWindowRect(hwnd, ctypes.byref(rc)):
+            return None
+    return rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top
+
+
+def windows_above(hwnd, limit: int = 500) -> list:
+    """Screen rects of the windows above ``hwnd`` in the Z order that can hide part of it: visible, not
+    minimised, not cloaked, not click-through (overlays like ours), not the taskbar. Window-manager
+    information only (Z order, style, position); no process is touched."""
+    if not IS_WIN or not hwnd:
+        return []
+    out = []
+    click_through = WS_EX_LAYERED | WS_EX_TRANSPARENT
+    h = user32.GetWindow(hwnd, GW_HWNDPREV)
+    steps = 0
+    while h and steps < limit:
+        steps += 1
+        try:
+            if (user32.IsWindowVisible(h) and not user32.IsIconic(h) and not _cloaked(h)
+                    and (user32.GetWindowLongW(h, GWL_EXSTYLE) & click_through) != click_through
+                    and _class(h) not in NOT_COVERING):
+                r = _rect(h)
+                if r and r[2] > 0 and r[3] > 0:
+                    out.append(r)
+        except OSError:
+            pass
+        h = user32.GetWindow(h, GW_HWNDPREV)
+    return out
+
+
+def overlaps(box, rects) -> bool:
+    """True if ``box`` (x, y, w, h) shares pixels with one of ``rects``."""
+    x, y, w, h = box
+    return any(rx < x + w and x < rx + rw and ry < y + h and y < ry + rh for rx, ry, rw, rh in rects)
+
+
+def region_free(game: GameWindow | None, box) -> bool:
+    """Nothing lies over ``box`` of the game window – then the screen shows the chat even with DBD behind."""
+    if game is None or box is None:
+        return False
+    return not overlaps(box, windows_above(game.hwnd))

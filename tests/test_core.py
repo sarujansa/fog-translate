@@ -189,11 +189,32 @@ def _engine(**values):
 GAME = SimpleNamespace(client=(0, 0, 3440, 1440), minimized=False)
 
 
-def test_nothing_is_looked_at_while_dbd_is_in_the_background():
-    eng, _ = _engine()
+def test_with_dbd_behind_the_region_is_read_only_while_nothing_covers_it():
+    eng, _ = _engine(read_background=False)
     looked = []
     eng.look(GAME, False, lambda box: looked.append(box))
     assert looked == [] and eng.status == "background"
+
+    eng, _ = _engine()                                 # default: read in the background ...
+    eng.look(GAME, False, lambda box: looked.append(box), region_free=lambda g, box: False)
+    assert looked == [] and eng.status == "covered"    # ... but never a window lying over the chat
+    eng.look(GAME, False, lambda box: looked.append(box) or _chat(1))
+    assert looked == [] and eng.status == "covered"    # no check given = treated as covered
+    eng.look(GAME, False, lambda box: looked.append(box) or _chat(1), region_free=lambda g, box: True)
+    assert len(looked) == 1 and eng.status == "watching"
+
+
+def test_our_own_overlay_is_blacked_out_of_the_picture():
+    from fogtranslate.grab import blank
+    img = np.full((100, 200, 3), 255, np.uint8)
+    blank(img, (1000, 500, 200, 100), [(1150, 550, 300, 300), (0, 0, 10, 10)])
+    assert img[60, 160].sum() == 0 and img[10, 10].sum() == 765 and img[60, 140].sum() == 765
+
+
+def test_window_overlap():
+    from fogtranslate.window import overlaps
+    assert overlaps((0, 0, 100, 100), [(99, 99, 10, 10)])
+    assert not overlaps((0, 0, 100, 100), [(100, 0, 10, 10), (0, 100, 5, 5)])
 
 
 def test_requests_keep_the_minimum_gap_and_the_daily_cap():

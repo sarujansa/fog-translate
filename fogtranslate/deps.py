@@ -28,7 +28,7 @@ def needed(req: str = REQ, stamp: str = STAMP) -> bool:
 def main() -> int:
     if not needed():
         return 0
-    print("Pakete werden aktualisiert ...")
+    print("Updating packages ...")
     code = subprocess.call([sys.executable, "-m", "pip", "install", "--isolated", "--index-url",
                             "https://pypi.org/simple", "--require-hashes", "--only-binary=:all:", "-r", REQ])
     if code == 0:

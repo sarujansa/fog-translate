@@ -1,5 +1,9 @@
-"""Marking the chat region: a dimmed full-size window over the DBD picture, drag a box, Enter/release = done,
-Esc = cancel. Only the own window takes the mouse – nothing is sent to the game."""
+"""Marking the chat region: a dimmed full-size window over the DBD picture, drag a box, release = done,
+Esc / right click = cancel. Only the own window takes the mouse – nothing is sent to the game.
+
+Every pixel of this window stays at least slightly opaque: on Windows a fully transparent pixel of a translucent
+window lets the click through to the window below (the game) – the old box was such a hole, so pressing inside
+it never reached the picker and the region could not be marked anew (Saru, 09.11.2026)."""
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QRect, Qt
@@ -25,11 +29,21 @@ class RegionPicker(QWidget):
         self.setGeometry(*self.client)
         self.setCursor(Qt.CursorShape.CrossCursor)
 
+    DIM = QColor(0, 0, 0, 120)
+    INSIDE = QColor(255, 196, 92, 28)          # never alpha 0 (see module docstring)
+
     def start(self):
         self.show()
         self.raise_()
         self.activateWindow()
         self.setFocus()
+        self.grabMouse()
+        self.grabKeyboard()
+
+    def closeEvent(self, event):
+        self.releaseMouse()
+        self.releaseKeyboard()
+        super().closeEvent(event)
 
     def _finish(self, rel):
         self.close()
@@ -65,18 +79,24 @@ class RegionPicker(QWidget):
 
     def paintEvent(self, _event):
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor(0, 0, 0, 120))
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+        p.fillRect(self.rect(), self.DIM)
         if self._box is not None:
             b = self._box.normalized()
-            p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
-            p.fillRect(b, Qt.GlobalColor.transparent)
+            p.fillRect(b, self.INSIDE)                 # lighter, but still catches the mouse
             p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
             p.setPen(QPen(QColor(255, 196, 92), 2))
             p.drawRect(b)
+            if self._start is None:
+                f = QFont()
+                f.setPixelSize(15)
+                p.setFont(f)
+                p.drawText(b.adjusted(0, -22, 0, 0).topLeft() + QPoint(2, 0), "current area – drag a new one")
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
         f = QFont()
         f.setPixelSize(22)
         p.setFont(f)
         p.setPen(QColor(255, 255, 255))
         p.drawText(self.rect().adjusted(0, 40, 0, 0), int(Qt.AlignmentFlag.AlignHCenter),
-                   "Chat-Bereich mit der Maus aufziehen  ·  Esc / Rechtsklick = abbrechen")
+                   "Drag a box around the chat  ·  Esc / right click = cancel")
         p.end()

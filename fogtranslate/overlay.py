@@ -1,7 +1,8 @@
 """The translation window: frameless, always on top, click-through, never takes focus.
 
-On Windows it is excluded from screen capture (``WDA_EXCLUDEFROMCAPTURE``, own window only), so it never shows
-up in its own looks, in Fog Scout's detection or in recordings/screenshots.
+It shows up in screenshots and recordings (Saru's wish). The program never reads it back: the look thread blacks
+out its rectangle (``grab.blank``). Optionally (``hide_in_captures``) it is excluded from capture on Windows
+(``WDA_EXCLUDEFROMCAPTURE``, own window only).
 """
 from __future__ import annotations
 
@@ -24,14 +25,15 @@ LANG = QColor(255, 196, 92)
 ORIGINAL = QColor(150, 150, 150)
 
 
-def exclude_from_capture(widget) -> bool:
+def exclude_from_capture(widget, on: bool) -> bool:
     if sys.platform != "win32":
         return False
     import ctypes
     user32 = ctypes.WinDLL("user32", use_last_error=True)
     user32.SetWindowDisplayAffinity.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
     user32.SetWindowDisplayAffinity.restype = ctypes.c_int
-    return bool(user32.SetWindowDisplayAffinity(ctypes.c_void_p(int(widget.winId())), 0x11))  # EXCLUDEFROMCAPTURE
+    # 0x11 = WDA_EXCLUDEFROMCAPTURE, 0 = WDA_NONE
+    return bool(user32.SetWindowDisplayAffinity(ctypes.c_void_p(int(widget.winId())), 0x11 if on else 0))
 
 
 class TranslationOverlay(QWidget):
@@ -45,7 +47,9 @@ class TranslationOverlay(QWidget):
         self.show_original = show_original
         self.lines: list[ChatLine] = []
         self.set_font_px(font_px)
-        self._excluded = False
+        self.hide_in_captures = False
+        self._affinity = None
+        self.rect_on_screen = None           # (x, y, w, h) while shown – read by the look thread
 
     def set_font_px(self, px: int):
         self.font_main = QFont("Segoe UI" if sys.platform == "win32" else "Sans")
@@ -83,16 +87,23 @@ class TranslationOverlay(QWidget):
         """``spot_for_size((w, h)) → (x, y)``; hidden when there is nothing to show."""
         self.lines = list(lines)
         if not self.lines:
+            self.rect_on_screen = None
             self.hide()
             return
         w, h = self.layout_size(self.lines)
         x, y = spot_for_size((w, h))
         self.setGeometry(x, y, w, h)
+        self.rect_on_screen = (x, y, w, h)
         if not self.isVisible():
             self.show()
-            if not self._excluded:
-                self._excluded = exclude_from_capture(self)
+        if self._affinity is not self.hide_in_captures:
+            exclude_from_capture(self, self.hide_in_captures)
+            self._affinity = self.hide_in_captures
         self.update()
+
+    def hideEvent(self, event):
+        self.rect_on_screen = None
+        super().hideEvent(event)
 
     def paintEvent(self, _event):
         p = QPainter(self)

@@ -5,8 +5,8 @@ from . import claude, gemini, ollama
 
 SERVICES = {                     # id → (label, sends to the internet)
     "claude": ("Claude (Anthropic)", True),
-    "gemini": ("Gemini (Google, kostenlos möglich)", True),
-    "ollama": ("Ollama (lokal, offline)", False),
+    "gemini": ("Gemini (Google, free tier available)", True),
+    "ollama": ("Ollama (local, offline)", False),
 }
 DEFAULT = "claude"
 KEY_SETTING = {"claude": "claude_key", "gemini": "gemini_key"}
