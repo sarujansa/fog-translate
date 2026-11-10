@@ -88,7 +88,8 @@ picture once. Keys can also come from `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
 **Check for updates** (bottom right) – the program asks GitHub only when you click it.
 
 - Installed with `git clone`: shows whether there is something new; **Update and restart** fetches it (only if
-  nothing in the folder was changed) and restarts. `start.bat` installs changed packages automatically.
+  nothing in the folder was changed) and restarts. `start.bat` installs changed packages automatically. A clone
+  under the old GitHub account name is switched to `github.com/senisinx/fog-translate` on the way.
 - Installed from a ZIP: shows the new version number and opens the download page.
 
 ## If something is wrong

@@ -21,6 +21,12 @@ REPO_URL = "https://github.com/senisinx/fog-translate"
 RELEASES_URL = REPO_URL + "/releases/latest"
 VERSION_URL = "https://raw.githubusercontent.com/senisinx/fog-translate/main/fogtranslate/__init__.py"
 BRANCH = "main"
+# 0.9.4 (user: the old account name should disappear everywhere): clones made before the GitHub account was renamed
+# fetch through GitHub's redirect from the old name, which would end if someone took that name. Exactly those origin
+# addresses are moved to the new one before the fetch; a fork or any other address is left alone.
+OLD_OWNER = "sarujansa"                                # the account's name before 0.9.3 – the only place left
+OLD_ORIGIN = re.compile(r"(?i)^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)"
+                        + OLD_OWNER + r"/fog-translate(?:\.git)?/?$")
 GIT_TIMEOUT_S = 60
 MAX_BYTES = 64 * 1024
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -74,6 +80,7 @@ def check(root: str = ROOT, git=None, fetch_version=None) -> Check:
             return Check("branch")
         if git("status", "--porcelain", "--untracked-files=no"):
             return Check("dirty")
+        move_origin(git)
         git("fetch", "--quiet", "origin", BRANCH)
         ahead = int(git("rev-list", "--count", "origin/%s..HEAD" % BRANCH) or 0)
         behind = int(git("rev-list", "--count", "HEAD..origin/%s" % BRANCH) or 0)
@@ -82,6 +89,18 @@ def check(root: str = ROOT, git=None, fetch_version=None) -> Check:
     if ahead:
         return Check("ahead")
     return Check("behind", behind) if behind else Check("current")
+
+
+def move_origin(git) -> bool:
+    """Point origin from the old account to REPO_URL (only .git/config changes). True if moved."""
+    try:
+        url = git("config", "--local", "--get", "remote.origin.url")      # as stored, no insteadOf applied
+        if not OLD_ORIGIN.match(url.strip()):
+            return False
+        git("remote", "set-url", "origin", REPO_URL + ".git")
+        return True
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        return False
 
 
 def apply(root: str = ROOT, git=None) -> bool:
