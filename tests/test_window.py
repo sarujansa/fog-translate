@@ -126,3 +126,37 @@ def test_the_selftest_passes(app, tmp_path, monkeypatch):
     assert run(str(out)) == 0
     result = json.loads(out.read_text(encoding="utf-8"))
     assert result["ok"] and result["checks"]["logo"]["info"] > 1000
+
+
+def test_the_daily_limit_can_be_set_in_the_window_and_shows_today(app):
+    win = MainWindow(Settings())
+    assert "Today 0 / 300 requests" in win.costs.text()
+    win.daily_cap.setValue(120)
+    assert Settings()["daily_cap"] == 120                 # saved
+    assert "Today 0 / 120 requests" in win.costs.text()
+    win.close()
+
+
+def test_raising_the_limit_after_it_was_reached_goes_on_reading(app):
+    from datetime import datetime
+    win = MainWindow(Settings())
+    win.daily_cap.setValue(10)
+    day = datetime.now().strftime("%Y-%m-%d")
+    for _ in range(10):
+        win.settings.count_request(day, day[:7], 0.0)
+    win.engine.status = "cap"
+    win.daily_cap.setValue(20)
+    assert win.engine.status == "watching"
+    win.close()
+
+
+def test_the_wheel_does_not_change_the_limit_without_focus(app):
+    from PySide6.QtCore import QPoint, QPointF, Qt
+    from PySide6.QtGui import QWheelEvent
+    win = MainWindow(Settings())
+    before = win.daily_cap.value()
+    ev = QWheelEvent(QPointF(5, 5), QPointF(5, 5), QPoint(0, 0), QPoint(0, 120), Qt.MouseButton.NoButton,
+                     Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.NoScrollPhase, False)
+    win.daily_cap.wheelEvent(ev)
+    assert win.daily_cap.value() == before
+    win.close()

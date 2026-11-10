@@ -456,3 +456,8 @@ def test_a_doubled_misreading_does_not_replace_the_message():
                                              "dbd chat what language do people write in dbd chat")])
     assert not added and not replaced
     assert t.entries[0].text == "what language do people write in dbd chat"
+
+
+def test_an_odd_daily_limit_in_the_file_falls_back(tmp_path):
+    (tmp_path / "settings.json").write_text('{"daily_cap": 0}', encoding="utf-8")
+    assert Settings(str(tmp_path))["daily_cap"] == 300

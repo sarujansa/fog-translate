@@ -90,6 +90,8 @@ class Settings:
             if not services.valid_model(service, self.values[key]):
                 self.values[key] = services.DEFAULT_MODEL[service]
         self.values["accepted"] = [x for x in self.values["accepted"] if x in services.SERVICES]
+        if not 10 <= int(self.values["daily_cap"]) <= 5000:
+            self.values["daily_cap"] = DEFAULTS["daily_cap"]
         if not 1 <= int(self.values["ollama_port"]) <= 65535:
             self.values["ollama_port"] = 11434
 

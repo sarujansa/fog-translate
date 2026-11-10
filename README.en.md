@@ -18,7 +18,7 @@ side. Unofficial fan tool, not affiliated with Behaviour Interactive.
 2. After **Start**, the program looks at that area about once a second (screen pixels only).
 3. It compares only the **text** in the area (bright, sharp strokes on the dark chat panel), so the moving lobby
    behind the chat does not count. When the text has changed, the picture of the area is sent to the chosen
-   service – at most every 3 s (Gemini: 6.5 s) and at most 300 times a day.
+   service – at most every 3 s (Gemini: 6.5 s) and at most 300 times a day (set in the window: "Daily limit", 10–5000; after that it pauses until midnight).
 4. The service reads every message, joins wrapped lines, detects the language and translates it into your target
    language, returning name, original, language and translation.
 5. Messages already shown are recognised and not shown again; a better reading of a message replaces the old one.

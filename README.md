@@ -19,7 +19,7 @@ nebeneinander.
 2. Nach **Start** schaut das Programm etwa einmal pro Sekunde auf diesen Bereich (nur Bildschirmpixel).
 3. Verglichen wird nur die **Schrift** im Bereich (helle, scharfe Striche auf dem dunklen Chat-Feld) – die bewegte
    Lobby dahinter zählt nicht. Hat sich die Schrift geändert, geht das Bild des Bereichs an den gewählten Dienst –
-   höchstens alle 3 s (Gemini: 6,5 s), höchstens 300-mal am Tag.
+   höchstens alle 3 s (Gemini: 6,5 s), höchstens 300-mal am Tag (einstellbar: „Daily limit“).
 4. Der Dienst liest jede Nachricht, fügt umgebrochene Zeilen zusammen, erkennt die Sprache und übersetzt in deine
    Zielsprache; zurück kommen Name, Original, Sprache und Übersetzung.
 5. Schon gezeigte Nachrichten werden erkannt und nicht doppelt gezeigt; eine bessere Lesung ersetzt die alte.
@@ -37,7 +37,7 @@ nebeneinander.
 - Die Oberfläche ist Englisch.
 - **Internet:** nur zum gewählten Dienst (siehe unten). Gesendet wird das Bild des markierten Bereichs – **es kann
   Spielernamen und Nachrichten anderer Spieler zeigen** – und die Zielsprache. Nur wenn sich dort etwas geändert
-  hat, höchstens alle 3 s (Gemini: 6,5 s), höchstens 300 Anfragen am Tag (einstellbar in `settings.json`).
+  hat, höchstens alle 3 s (Gemini: 6,5 s), höchstens 300 Anfragen am Tag (einstellbar im Fenster: „Daily limit“, 10–5000; danach Pause bis Mitternacht).
 - API-Keys werden mit Windows-DPAPI verschlüsselt gespeichert, nie im Klartext und nie im Log.
 
 ## Dienste
