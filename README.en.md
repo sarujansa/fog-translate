@@ -21,6 +21,8 @@ side. Unofficial fan tool, not affiliated with Behaviour Interactive.
    service – at most every 2 s (Gemini: 6.5 s) and at most 300 times a day (set in the window: "Daily limit", 10–5000; after that it pauses until midnight).
 4. The service reads every message, joins wrapped lines, detects the language and translates it into your target
    language, returning name, original, language and translation.
+   When the chat moves fast, the program keeps intermediate pictures and sends them stacked with the next request,
+   so messages that already scrolled out of the area are not lost.
 5. Messages already shown are recognised and not shown again; a better reading of a message replaces the old one.
 6. Foreign messages appear in the overlay above the chat (language, name, translation, original in small print)
    and in the list in the main window. The overlay fades after 25 s without anything new.
@@ -63,7 +65,9 @@ settings and keys stay.
 1. Install Python 3.12–3.14 from python.org.
 2. Download this repository (green **Code** button → **Download ZIP**, or `git clone`) and double-click
    `start.bat` (the first start installs the packages; every version is pinned and checked by SHA-256).
-3. Choose a service, paste your API key (not needed for Ollama), confirm the notice.
+3. At the first start the **setup assistant** walks through service, API key (with a test) and the notice – later
+   any time via "Setup assistant". The key is never asked for by the installer, only in the program, where it is
+   stored encrypted at once.
 4. Open DBD (lobby with the chat visible), **Mark chat area**: drag a box around the whole chat (a little wider
    than the longest line), **Save**. Then **Start**.
 

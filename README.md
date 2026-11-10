@@ -23,6 +23,8 @@ nebeneinander.
    Streifen mit den neuen Zeilen – das Programm erkennt, wie weit der Chat gescrollt ist.
 4. Der Dienst liest jede Nachricht, fügt umgebrochene Zeilen zusammen, erkennt die Sprache und übersetzt in deine
    Zielsprache; zurück kommen Name, Original, Sprache und Übersetzung.
+   Läuft der Chat schnell, hebt das Programm Zwischenbilder auf und schickt sie gestapelt mit der nächsten Anfrage,
+   damit keine Nachricht verloren geht, die schon aus dem Feld gescrollt ist.
 5. Schon gezeigte Nachrichten werden erkannt und nicht doppelt gezeigt; eine bessere Lesung ersetzt die alte.
 6. Fremdsprachige Nachrichten erscheinen im Overlay über dem Chat (Sprache, Name, Übersetzung, Original klein) und
    in der Liste im Hauptfenster. Das Overlay blendet nach 25 s ohne Neues aus.
@@ -68,7 +70,9 @@ alte Fassung, Einstellungen und Keys bleiben.
 1. Python 3.12–3.14 von python.org installieren.
 2. `start.bat` doppelklicken (beim ersten Mal werden die Pakete installiert, alle Versionen fest und per SHA-256
    geprüft).
-3. Dienst wählen, API-Key eintragen (nicht bei Ollama), Hinweis bestätigen.
+3. Beim ersten Start führt der **Einrichtungs-Assistent** durch Dienst, API-Key (mit Test) und Hinweis – später
+   jederzeit über „Setup assistant“. Der Key wird nie im Installer abgefragt, sondern im Programm und dort sofort
+   verschlüsselt gespeichert.
 4. DBD öffnen (Lobby mit sichtbarem Chat), **Mark chat area**: das Programm zeigt ein Standbild des Spiels – Rahmen um
    den ganzen Chat ziehen (etwas breiter als die längste Zeile), **Save**. Dann **Start**.
 
