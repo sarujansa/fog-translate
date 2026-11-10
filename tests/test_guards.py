@@ -70,3 +70,33 @@ def test_the_license_keeps_modifying_behind_permission():
     with open(os.path.join(root, "LICENSE"), encoding="utf-8") as fh:
         text = fh.read()
     assert "written permission" in text and "schriftlicher Erlaubnis" in text
+
+
+WORKFLOWS = os.path.join(os.path.dirname(ROOT), ".github", "workflows")
+
+
+def _workflow(name):
+    with open(os.path.join(WORKFLOWS, name), encoding="utf-8") as fh:
+        return fh.read()
+
+
+def test_every_action_is_pinned_to_a_full_commit_sha():
+    for name in sorted(os.listdir(WORKFLOWS)):
+        if not name.endswith((".yml", ".yaml")):
+            continue
+        uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)(.*)$", _workflow(name), re.M)
+        assert uses, name
+        for ref, comment in uses:
+            assert re.fullmatch(r"actions/[\w.-]+@[0-9a-f]{40}", ref), (name, ref)   # only GitHub's own actions
+            assert re.search(r"#\s*v\d", comment), (name, ref, "the tag belongs in the comment")
+
+
+def test_only_the_release_job_may_write_and_attest():
+    wf = _workflow("build.yml")
+    head, release = wf[:wf.index("\njobs:")], wf[wf.index("\n  release:"):]
+    assert "permissions:\n  contents: read" in head and "permissions:\n  contents: read" in _workflow("tests.yml")
+    assert "if: github.event_name == 'push' && github.ref == 'refs/heads/main'" in release
+    for right in ("contents: write", "id-token: write", "attestations: write"):
+        assert len(re.findall(r"^ +%s\b" % right, wf, re.M)) == 1 and right in release, right
+    assert "actions/attest-build-provenance@" in release
+    assert release.index("attest-build-provenance") < release.index("gh release create")
