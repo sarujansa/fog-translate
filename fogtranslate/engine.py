@@ -16,6 +16,7 @@ from .lines import ChatLine, Transcript
 from .translate import Result, TranslateError
 
 KEEP_SHOWN = 6
+ERROR_WAIT_S = 10.0              # after any other failed request
 QUOTA_WAIT_S = 60.0              # after a "limit reached" answer, wait at least this long
 SERVICE_GAP_S = {"gemini": 6.5}  # Gemini's free tier allows about 10 requests a minute
 
@@ -87,6 +88,8 @@ class Engine:
                 self._try_send()
             return
         top = self.gate.crop_top
+        if self._pending is not None:
+            top = 0              # an earlier change is still unsent: its lines are only in the whole picture
         self._pending = img[top:] if 0 < top < img.shape[0] - 8 else img     # only the new lines
         self._try_send()
 
@@ -114,8 +117,12 @@ class Engine:
             self.status = "error"
             self.error = outcome.kind
             self.last_counts = {}
-            if outcome.kind == "quota":
-                self._not_before = self.clock() + QUOTA_WAIT_S
+            # the picture of that request never arrived: forget what counts as sent, so the whole chat goes out
+            # again – after a pause, so a lasting error (no key, no network) is not hammered every 2 s
+            self.gate.reset()
+            self._pending = None
+            wait = QUOTA_WAIT_S if outcome.kind == "quota" else ERROR_WAIT_S
+            self._not_before = self.clock() + wait
             return False
         assert isinstance(outcome, Result)
         self.settings.count_request(n.strftime("%Y-%m-%d"), n.strftime("%Y-%m"), outcome.cost_usd)

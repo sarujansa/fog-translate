@@ -534,3 +534,43 @@ def test_saved_old_speed_settings_move_to_the_faster_defaults(tmp_path):
     (tmp_path / "settings.json").write_text('{"look_s": 2.0, "min_gap_s": 5.0}', encoding="utf-8")
     s = Settings(str(tmp_path))
     assert s["look_s"] == 2.0 and s["min_gap_s"] == 5.0     # own values stay
+
+
+def test_a_line_that_could_not_be_sent_yet_is_not_lost_when_the_next_one_comes():
+    """Two messages inside the minimum gap: the second crop must not replace the unsent first one."""
+    eng, t = _engine(min_gap_s=5.0)
+    base = list(CHAT)
+    one = base[1:] + ["Nea: kto kempit na hukah"]
+    two = one[1:] + ["Ace: ya idu na generator"]
+    for frame in (base, base):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    assert len(eng.worker.sent) == 1                       # whole chat sent, gap starts
+    eng.worker.busy = False
+    for frame in (one, one, two, two):                     # both arrive inside the gap
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    assert len(eng.worker.sent) == 1
+    t[0] = 6.0
+    eng.look(GAME, True, lambda box: _chat_lines(two))
+    assert len(eng.worker.sent) == 2
+    assert eng.worker.sent[-1].shape[0] == 260             # the whole area: both new lines are in it
+
+
+def test_after_a_failed_request_the_chat_is_sent_again():
+    eng, t = _engine(min_gap_s=0.0)
+    base = list(CHAT)
+    one = base[1:] + ["Nea: kto kempit na hukah"]
+    for frame in (base, base):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    eng.answer(Result([], 0.0))
+    for frame in (one, one):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    assert len(eng.worker.sent) == 2 and eng.worker.sent[-1].shape[0] < 80
+    eng.answer(TranslateError("net"))                      # that crop never arrived
+    t[0] = 5.0
+    eng.look(GAME, True, lambda box: _chat_lines(one))
+    eng.look(GAME, True, lambda box: _chat_lines(one))
+    assert len(eng.worker.sent) == 2                       # short wait after an error, no hammering
+    t[0] = 20.0
+    eng.look(GAME, True, lambda box: _chat_lines(one))
+    eng.look(GAME, True, lambda box: _chat_lines(one))
+    assert len(eng.worker.sent) == 3 and eng.worker.sent[-1].shape[0] == 260   # everything again
