@@ -136,8 +136,8 @@ def test_the_setup_shows_the_terms_in_the_chosen_language():
         path = os.path.join(root, "installer", "terms", "terms_%s.txt" % code)
         with open(path, "rb") as fh:
             raw = fh.read()
-        assert raw.startswith(b"\xef\xbb\xbf") and b"\r" not in raw, code
-        text = raw[3:].decode("utf-8")
+        assert raw.startswith(b"\xef\xbb\xbf"), code
+        text = raw[3:].decode("utf-8").replace("\r\n", "\n")      # a Windows checkout has CRLF line ends
         assert text.startswith("Fog Translate – ") and "Copyright (c) 2026 senisinx." in text.splitlines()[1], code
         assert re.findall(r"^(\d)\. ", text, re.M) == list("12345678"), code
         for name in ("GitHub", "Behaviour Interactive", "Dead by Daylight", "Easy Anti-Cheat", "Anthropic", "Google",
