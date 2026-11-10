@@ -119,14 +119,22 @@ def test_the_status_says_when_the_marked_area_shows_no_text(app):
     win.close()
 
 
-def test_the_selftest_passes(app, tmp_path, monkeypatch):
+def test_the_selftest_passes(tmp_path):
+    """Run like the .exe runs it: a fresh process. Inside the test process the windows, timers and threads of
+    earlier tests got in the way (an import race, then a crash in processEvents – CI, 10.11.2026)."""
     import json
-    from fogtranslate.selftest import run
+    import os
+    import subprocess
+    import sys
     out = tmp_path / "selftest.json"
-    assert run(str(out)) == 0
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", FOGTRANSLATE_DATA_DIR=str(tmp_path / "data"))
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    proc = subprocess.run([sys.executable, "-m", "fogtranslate", "--selftest", str(out)], cwd=root, env=env,
+                          capture_output=True, text=True, timeout=120)
     result = json.loads(out.read_text(encoding="utf-8"))
+    failed = {k: v for k, v in result["checks"].items() if not v["ok"]}
+    assert proc.returncode == 0, (failed, proc.stderr[-2000:])
     assert result["ok"] and result["checks"]["logo"]["info"] > 1000
-
 
 def test_the_daily_limit_can_be_set_in_the_window_and_shows_today(app):
     win = MainWindow(Settings())

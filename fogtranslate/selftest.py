@@ -29,7 +29,9 @@ def run(out_path: str) -> int:
     check("frozen", lambda: bool(getattr(sys, "frozen", False)))
     modules = [m.name for m in pkgutil.iter_modules(fogtranslate.__path__)]
     check("modules", lambda: [importlib.import_module("fogtranslate." + m) and m for m in modules])
-    for lib in ("anthropic", "mss", "numpy", "PIL", "PySide6.QtWidgets"):
+    from .claude import sdk
+    check("import anthropic", lambda: sdk().__version__)
+    for lib in ("mss", "numpy", "PIL", "PySide6.QtWidgets"):
         check("import " + lib, lambda lib=lib: getattr(importlib.import_module(lib), "__version__", "ok"))
 
     with tempfile.TemporaryDirectory() as data:

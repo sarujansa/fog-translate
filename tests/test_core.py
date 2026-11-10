@@ -461,3 +461,116 @@ def test_a_doubled_misreading_does_not_replace_the_message():
 def test_an_odd_daily_limit_in_the_file_falls_back(tmp_path):
     (tmp_path / "settings.json").write_text('{"daily_cap": 0}', encoding="utf-8")
     assert Settings(str(tmp_path))["daily_cap"] == 300
+
+
+# ---------------------------------------------------------------- only the new lines are sent
+def _chat_lines(lines, size=(480, 260), line_h=22):
+    """The DBD chat panel: newest line at the bottom, older ones pushed up."""
+    from PIL import Image, ImageDraw, ImageFont
+    w, h = size
+    pic = Image.new("RGB", size, (14, 14, 16))
+    d = ImageDraw.Draw(pic)
+    try:
+        font = ImageFont.load_default(size=16)
+    except TypeError:                                # old Pillow
+        font = ImageFont.load_default()
+    y = h - 8 - line_h
+    for text in reversed(lines):
+        d.text((10, y), text, fill=(235, 235, 235), font=font)
+        y -= line_h
+    return np.asarray(pic)[..., ::-1].copy()
+
+
+CHAT = ["Meg: hello all", "Dwight: who has a medkit", "Ace: gg ez", "Claudette: on the gen left",
+        "Nea: privet vsem", "Jake: brb", "Feng: lol nice save", "Kate: whats your build",
+        "Bill: camping hook again", "Quentin: im so tired", "Yui: last game for me"]
+
+
+def test_when_the_chat_scrolls_only_the_new_line_is_sent():
+    from fogtranslate.change import new_rows, text_mask
+    old = list(CHAT)
+    new = old[1:] + ["Nea: kto kempit na hukah"]
+    a, b = text_mask(_chat_lines(old)), text_mask(_chat_lines(new))
+    top = new_rows(a, b)
+    assert 260 - 22 - 8 - 25 <= top <= 260 - 22 - 8        # just above the newest line
+    crop = _chat_lines(new)[top:]
+    assert text_mask(crop).sum() < text_mask(_chat_lines(new)).sum() / 5
+
+
+def test_when_the_chat_is_not_full_yet_only_the_new_line_is_sent():
+    from fogtranslate.change import new_rows, text_mask
+    old = ["Meg: hello", "Ace: gg"]
+    a = text_mask(_chat_lines(old))
+    b = text_mask(_chat_lines(old + ["Nea: privet"]))
+    top = new_rows(a, b)
+    assert 150 <= top <= 260 - 22 - 8
+
+
+def test_the_whole_area_is_sent_first_and_when_nothing_lines_up():
+    from fogtranslate.change import new_rows, text_mask
+    b = text_mask(_chat_lines(["Meg: hello"]))
+    assert new_rows(None, b) == 0
+    other = text_mask(_chat_lines(["Completely %d different" % i for i in range(11)]))
+    assert new_rows(other, b) == 0
+
+
+def test_the_engine_sends_the_crop_of_new_lines():
+    eng, t = _engine(min_gap_s=0.0)
+    old = list(CHAT)
+    new = old[1:] + ["Nea: kto kempit na hukah"]
+    for frame in (old, old):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    assert eng.worker.sent[-1].shape[0] == 260           # first time: everything
+    eng.worker.busy = False
+    for frame in (new, new):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    assert len(eng.worker.sent) == 2 and eng.worker.sent[-1].shape[0] < 80
+
+
+def test_saved_old_speed_settings_move_to_the_faster_defaults(tmp_path):
+    (tmp_path / "settings.json").write_text('{"look_s": 1.0, "min_gap_s": 3.0}', encoding="utf-8")
+    s = Settings(str(tmp_path))
+    assert s["look_s"] == 0.5 and s["min_gap_s"] == 2.0
+    (tmp_path / "settings.json").write_text('{"look_s": 2.0, "min_gap_s": 5.0}', encoding="utf-8")
+    s = Settings(str(tmp_path))
+    assert s["look_s"] == 2.0 and s["min_gap_s"] == 5.0     # own values stay
+
+
+def test_a_line_that_could_not_be_sent_yet_is_not_lost_when_the_next_one_comes():
+    """Two messages inside the minimum gap: the second crop must not replace the unsent first one."""
+    eng, t = _engine(min_gap_s=5.0)
+    base = list(CHAT)
+    one = base[1:] + ["Nea: kto kempit na hukah"]
+    two = one[1:] + ["Ace: ya idu na generator"]
+    for frame in (base, base):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    assert len(eng.worker.sent) == 1                       # whole chat sent, gap starts
+    eng.worker.busy = False
+    for frame in (one, one, two, two):                     # both arrive inside the gap
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    assert len(eng.worker.sent) == 1
+    t[0] = 6.0
+    eng.look(GAME, True, lambda box: _chat_lines(two))
+    assert len(eng.worker.sent) == 2
+    assert eng.worker.sent[-1].shape[0] == 260             # the whole area: both new lines are in it
+
+
+def test_after_a_failed_request_the_chat_is_sent_again():
+    eng, t = _engine(min_gap_s=0.0)
+    base = list(CHAT)
+    one = base[1:] + ["Nea: kto kempit na hukah"]
+    for frame in (base, base):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    eng.answer(Result([], 0.0))
+    for frame in (one, one):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    assert len(eng.worker.sent) == 2 and eng.worker.sent[-1].shape[0] < 80
+    eng.answer(TranslateError("net"))                      # that crop never arrived
+    t[0] = 5.0
+    eng.look(GAME, True, lambda box: _chat_lines(one))
+    eng.look(GAME, True, lambda box: _chat_lines(one))
+    assert len(eng.worker.sent) == 2                       # short wait after an error, no hammering
+    t[0] = 20.0
+    eng.look(GAME, True, lambda box: _chat_lines(one))
+    eng.look(GAME, True, lambda box: _chat_lines(one))
+    assert len(eng.worker.sent) == 3 and eng.worker.sent[-1].shape[0] == 260   # everything again

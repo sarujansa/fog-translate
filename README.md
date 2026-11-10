@@ -16,10 +16,11 @@ nebeneinander.
 
 1. **Mark chat area** macht ein Standbild des DBD-Fensters; du ziehst einen Rahmen um den Chat und klickst **Save**.
    Der Bereich wird relativ zum Spielfenster gespeichert und passt auch bei anderer Fenstergröße.
-2. Nach **Start** schaut das Programm etwa einmal pro Sekunde auf diesen Bereich (nur Bildschirmpixel).
+2. Nach **Start** schaut das Programm zweimal pro Sekunde auf diesen Bereich (nur Bildschirmpixel).
 3. Verglichen wird nur die **Schrift** im Bereich (helle, scharfe Striche auf dem dunklen Chat-Feld) – die bewegte
    Lobby dahinter zählt nicht. Hat sich die Schrift geändert, geht das Bild des Bereichs an den gewählten Dienst –
-   höchstens alle 3 s (Gemini: 6,5 s), höchstens 300-mal am Tag (einstellbar: „Daily limit“).
+   höchstens alle 2 s (Gemini: 6,5 s), höchstens 300-mal am Tag (einstellbar: „Daily limit“). Geschickt wird nur der
+   Streifen mit den neuen Zeilen – das Programm erkennt, wie weit der Chat gescrollt ist.
 4. Der Dienst liest jede Nachricht, fügt umgebrochene Zeilen zusammen, erkennt die Sprache und übersetzt in deine
    Zielsprache; zurück kommen Name, Original, Sprache und Übersetzung.
 5. Schon gezeigte Nachrichten werden erkannt und nicht doppelt gezeigt; eine bessere Lesung ersetzt die alte.
@@ -37,10 +38,13 @@ nebeneinander.
 - Die Oberfläche ist Englisch.
 - **Internet:** nur zum gewählten Dienst (siehe unten). Gesendet wird das Bild des markierten Bereichs – **es kann
   Spielernamen und Nachrichten anderer Spieler zeigen** – und die Zielsprache. Nur wenn sich dort etwas geändert
-  hat, höchstens alle 3 s (Gemini: 6,5 s), höchstens 300 Anfragen am Tag (einstellbar im Fenster: „Daily limit“, 10–5000; danach Pause bis Mitternacht).
+  hat, höchstens alle 2 s (Gemini: 6,5 s), höchstens 300 Anfragen am Tag (einstellbar im Fenster: „Daily limit“, 10–5000; danach Pause bis Mitternacht).
 - API-Keys werden mit Windows-DPAPI verschlüsselt gespeichert, nie im Klartext und nie im Log.
 
 ## Dienste
+
+Am schnellsten übersetzen **Claude Haiku 5.5** und **Gemini Flash-Lite**; Claude Opus 5.5 liest schwierige
+Schriften am zuverlässigsten, braucht aber länger.
 
 | Dienst | Was du brauchst | Kosten | Daten |
 |---|---|---|---|
