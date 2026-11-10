@@ -8,14 +8,15 @@ from __future__ import annotations
 import base64
 
 from . import http
+from .i18n import N_
 from .translate import SCHEMA, SYSTEM, Result, TranslateError, answer_lines, instruction, png_bytes
 
 NAME = "gemini"
 HOST = "https://generativelanguage.googleapis.com"
 MODELS = {
-    "gemini-flash-latest": "Gemini Flash (recommended)",
-    "gemini-flash-lite-latest": "Gemini Flash-Lite (fastest, weaker)",
-    "gemini-pro-latest": "Gemini Pro (best quality, small free quota)",
+    "gemini-flash-latest": N_("Gemini Flash (recommended)"),
+    "gemini-flash-lite-latest": N_("Gemini Flash-Lite (fastest, weaker)"),
+    "gemini-pro-latest": N_("Gemini Pro (best quality, small free quota)"),
 }
 DEFAULT_MODEL = "gemini-flash-latest"
 TIMEOUT_S = 60.0

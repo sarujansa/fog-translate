@@ -12,6 +12,7 @@ import threading
 import time
 from dataclasses import dataclass
 
+from .i18n import N_
 from .lines import ChatLine
 
 log = logging.getLogger(__name__)
@@ -21,9 +22,10 @@ MAX_LINES = 30
 MAX_TOKENS_DEFAULT = 4096
 MAX_FIELD = 500
 
-LANGUAGES = {"de": "German", "en": "English", "fr": "French", "es": "Spanish", "it": "Italian",
-             "pt": "Portuguese", "pl": "Polish", "ru": "Russian", "tr": "Turkish", "nl": "Dutch",
-             "zh": "Chinese (Simplified)", "ja": "Japanese", "ko": "Korean"}
+# the English names go to the service ("Target language: German."); the window shows them through tr()
+LANGUAGES = {"de": N_("German"), "en": N_("English"), "fr": N_("French"), "es": N_("Spanish"), "it": N_("Italian"),
+             "pt": N_("Portuguese"), "pl": N_("Polish"), "ru": N_("Russian"), "tr": N_("Turkish"),
+             "nl": N_("Dutch"), "zh": N_("Chinese (Simplified)"), "ja": N_("Japanese"), "ko": N_("Korean")}
 
 SYSTEM = (
     "You read a cropped screenshot of the text chat of the video game Dead by Daylight (lobby or end-of-match "

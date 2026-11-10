@@ -4,7 +4,7 @@ Live-Übersetzung des Dead-by-Daylight-Chats (Windows). Der Nutzer markiert den 
 Zeilen schickt das Programm das Bild des Bereichs an den gewählten Dienst – Claude, Gemini oder lokal Ollama (liest +
 erkennt Sprache + übersetzt in einem Schritt)
 und zeigt neue fremdsprachige Zeilen in einem klickdurchlässigen Fenster über dem Chat. Eigenständig, unabhängig
-von Fog Scout (`senisinx/fog-scout`); Code daraus darf kopiert werden (gleicher Autor). Oberfläche **Englisch** (Wunsch des Nutzers, 0.6), Doku Deutsch,
+von Fog Scout (`senisinx/fog-scout`); Code daraus darf kopiert werden (gleicher Autor). Oberfläche **Englisch, Italienisch, Russisch, Chinesisch (vereinfacht), Japanisch, Koreanisch** (0.6 nur Englisch; 0.10 Wunsch des Nutzers; kein Deutsch), Doku Deutsch,
 Code und Kommentare Englisch.
 
 **Lizenz** (Wunsch des Nutzers, 0.7.4): eigene Bedingungen in `LICENSE` – nutzen und unverändert kostenlos
@@ -41,8 +41,13 @@ Abhängigkeiten in `THIRD_PARTY.md` eintragen (Wächter `test_every_package_is_l
   SHA-256), `installer/fogtranslate.iss` (Inno Setup 7.1.1 fest + Prüfsumme, nur für den Benutzer, keine
   Admin-Rechte, `{localappdata}\Programs\Fog Translate`). `.github/workflows/build.yml`: Bau, `--selftest` der .exe,
   Setup still installieren/prüfen/deinstallieren; Job `release` (einziger mit `contents: write`/`id-token`/`attestations`, Herkunftsnachweis per
-  `attest-build-provenance`) nur bei Push auf `main` und nur wenn es `v<Version>` noch nicht gibt. Die .exe aktualisiert nie selbst: „Check for updates“ liest
-  die Versionszeile und öffnet `update.RELEASES_URL`.
+  `attest-build-provenance`) nur bei Push auf `main` und nur wenn es `v<Version>` noch nicht gibt. **Die .exe aktualisiert sich auf Klick selbst** (0.10, vom Nutzer
+  freigegeben; bis 0.9.8 nur Download-Seite), `relupdate.py`, drei Klicks auf denselben Knopf, nie von selbst: „Check for updates“ liest nur `relupdate.API`
+  (neuestes Release dieses Repos), „Download update“ lädt das Setup nur von `DOWNLOAD_PREFIX`, ≤ `MAX_BYTES`, nach `data_dir/update` und behält es nur bei passender SHA-256
+  (`.sha256`-Datei und, falls gelistet, GitHubs Digest – beide müssen stimmen), „Install and restart“ prüft Name/Ordner/SHA-256 erneut (`setup_still_ours`), startet
+  das Setup mit `install_args` (`/update=1`) und beendet das Programm. Weiterleitungen nur auf HTTPS (`_HttpsOnly`), keine Konten/Tokens. Das Setup wartet bei `/update=1` auf den Mutex
+  `relupdate.MUTEX_NAME` (`[Code] InitializeSetup`, ≤ 60 s), startet die neue Version (`[Run] Check: IsUpdate`) und nach einem Abbruch die alte (`DeinitializeSetup`). Setup und
+  Programmordner gehören demselben Benutzer (keine Admin-Rechte) – daher keine Kopie in einen geschützten Ordner wie bei Fog Scout.
 - **Hotkey** (0.9, `hotkey.py`): nur `RegisterHotKey` für die eine eingestellte Kombination (`hide_hotkey`, Standard
   Strg+Alt+T; braucht Strg/Alt/Win oder eine F-Taste) – Windows meldet sie dem eigenen Programm über Qts nativen
   Ereignisfilter. Kein Tastatur-Hook, kein Lesen anderer Tasten, nichts ans Spiel.
@@ -80,6 +85,9 @@ kamen die Klicks beim Nutzer nicht an). `QT_ENABLE_HIGHDPI_SCALING=0` bleibt zus
 | `update.py`, `deps.py` | Update auf Klick (`check` → `Check.state` current/behind/ahead/dirty/branch/newer/error, vor dem Fetch `move_origin` (nur `origin` unter `OLD_OWNER` → `REPO_URL`), `apply` = `merge --ff-only`, `restart`), Pakete nach Update (`needed`, `main`, nur Standardbibliothek) |
 | `qtgeom.py` | Physische ↔ Qt-Pixel (`ratio` = devicePixelRatio des Hauptbildschirms) |
 | `wizard.py` | Einrichtungs-Assistent beim ersten Start (`wanted`: nie beendet/übersprungen **und** kein Key **und** kein Bereich; `SetupWizard`: Dienst + Zielsprache → Key/Hinweis/„Test“ → Abschluss; Keys nur über `Settings.set_api_key`, Test nur mit `sample_picture`; Überspringen/× setzt `setup_done`); Hauptfenster: `open_setup`/`_setup_done`, Knopf „Setup assistant“ |
+| `i18n.py`, `lang_*.py` | Sprache des Fensters: englischer Text = Schlüssel, `tr("…")`, `N_("…")` für Tabellen (übersetzt beim Anzeigen), Platzhalter `%s`/`%d` in gleicher Reihenfolge; `LANGS`, `ui_language` („auto“ = `system_language`, sonst Englisch), `set_language`. **Jeder neue Text braucht einen Eintrag in allen fünf `lang_<code>.py`** (`tests/test_i18n.py`: vollständig, gleiche Platzhalter, kein Markup, Namen unverändert). Wechsel im Fenster/Assistenten baut den Inhalt neu (`MainWindow.rebuild`, `SetupWizard._language_changed`); Log bleibt wie es ist. Setup: `[Languages]` in der .iss |
+| `theme.py` | Hell/Dunkel (`theme` = auto/light/dark): „auto“ = wie Qt es für Windows zeigt; sonst Fusion + eigene Palette (`DARK`/`LIGHT`) und `setColorScheme` für die Titelleiste; `HISTORY` = Farben der Nachrichtenliste je Aussehen (Kontrast im Test); das Overlay behält sein eigenes dunkles Design |
+| `relupdate.py` | Update der installierten .exe aus den GitHub-Releases (harte Regel oben): `parse_release`, `check`, `download`, `setup_still_ours`, `start_setup` (ohne PyInstaller-Variablen, Windows-DLL-Suche), `clean_update_folder` beim Start, `claim_mutex`; im Fenster `_update_button`, `_release_checked`/`_release_download`/`_release_install`; Tests mit `FakeGitHub` |
 | `hotkey.py` | `parse` („Ctrl+Alt+T“ → Modifikatoren, Taste), `message_id` (WM_HOTKEY aus der nativen Nachricht), `Hotkey.start/stop` (RegisterHotKey + Filter, Fehler nie in die Ereignisschleife) |
 | `selftest.py` | `--selftest RESULT.json`: Module, Bibliotheken, Fenster offscreen, Logo; JSON, Exit 0 = ok (CI prüft die .exe damit) |
 | `icon.py` | Logo per QPainter (zwei Sprechblasen + Nebel, `paint`/`pixmap`/`icon`, `SIZES`), `set_app_id` (eigenes Taskleisten-Symbol), `ico_bytes`/`save_ico` (für .exe und Setup); `assets/logo.png` erzeugt `tools/export_logo.py` – nach Änderungen an der Zeichnung neu erzeugen |

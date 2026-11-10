@@ -29,7 +29,7 @@ a = Analysis(
     excludes=["tkinter"],
     noarchive=False,
 )
-# never used: Qt's software OpenGL (20 MB) and Qt's own translations (the program is English)
+# never used: Qt's software OpenGL (20 MB) and Qt's own translations (the program brings its own texts, i18n.py)
 a.binaries = [b for b in a.binaries if not b[0].replace("\\", "/").endswith("opengl32sw.dll")]
 a.datas = [d for d in a.datas if "/translations/" not in d[0].replace("\\", "/")]
 pyz = PYZ(a.pure)

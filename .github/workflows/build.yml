@@ -95,6 +95,20 @@ jobs:
           $s = Start-Process -FilePath (Join-Path $dir "FogTranslate.exe") -ArgumentList "--selftest", "`"$out`"" -Wait -PassThru
           Get-Content $out
           if ($s.ExitCode -ne 0) { throw "Selbsttest der installierten .exe: Code $($s.ExitCode)" }
+          # the way an update from the program takes: /update=1 installs over it and starts the program again
+          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/update=1", "/DIR=`"$dir`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Setup /update=1: Code $($p.ExitCode)" }
+          $running = $null
+          foreach ($i in 1..40) {
+            $running = Get-Process -Name FogTranslate -ErrorAction SilentlyContinue
+            if ($running) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $running) { throw "nach /update=1 wurde Fog Translate nicht wieder gestartet" }
+          Start-Sleep -Seconds 3
+          if (-not (Get-Process -Name FogTranslate -ErrorAction SilentlyContinue)) { throw "Fog Translate endete gleich nach dem Start" }
+          Get-Process -Name FogTranslate | Stop-Process -Force
+          Start-Sleep -Seconds 2
           $u = Start-Process -FilePath (Join-Path $dir "unins000.exe") -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
           if ($u.ExitCode -ne 0) { throw "Deinstallation: Code $($u.ExitCode)" }
           Start-Sleep -Seconds 3

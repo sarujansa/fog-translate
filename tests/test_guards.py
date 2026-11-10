@@ -30,7 +30,7 @@ def test_no_input_or_process_apis():
 
 
 NETWORK = {"claude.py", "gemini.py", "ollama.py", "http.py",     # the services and their HTTP helper
-           "update.py"}                                         # GitHub, only on the user's click
+           "update.py", "relupdate.py"}                         # GitHub, only on the user's click
 
 
 def test_only_the_services_talk_to_the_network():
@@ -100,3 +100,22 @@ def test_only_the_release_job_may_write_and_attest():
         assert len(re.findall(r"^ +%s\b" % right, wf, re.M)) == 1 and right in release, right
     assert "actions/attest-build-provenance@" in release
     assert release.index("attest-build-provenance") < release.index("gh release create")
+
+
+def test_the_updater_reaches_only_this_repository_on_github():
+    import fogtranslate.relupdate as r
+    assert r.API == "https://api.github.com/repos/senisinx/fog-translate/releases/latest"
+    assert r.DOWNLOAD_PREFIX == "https://github.com/senisinx/fog-translate/releases/download/"
+    with open(os.path.join(ROOT, "relupdate.py"), encoding="utf-8") as fh:
+        text = fh.read()
+    assert set(re.findall(r"https://[^\s\"']+", text)) <= {r.API.replace(r.REPO, "%s"), r.DOWNLOAD_PREFIX.replace(r.REPO, "%s")}
+
+
+def test_the_setup_waits_for_the_program_by_the_same_mutex_name():
+    import fogtranslate.relupdate as r
+    with open(os.path.join(os.path.dirname(ROOT), "installer", "fogtranslate.iss"), encoding="utf-8") as fh:
+        iss = fh.read()
+    assert "MutexName = '%s';" % r.MUTEX_NAME in iss
+    assert "Check: IsUpdate" in iss and "/update=1" in r.install_args()
+    for lang in ("Italian", "Russian", "ChineseSimplified", "Japanese", "Korean"):
+        assert "compiler:Languages\\%s.isl" % lang in iss

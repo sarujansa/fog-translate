@@ -15,33 +15,34 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QRadioButton, QStackedWidget, QVBoxLayout, QWidget)
 
-from . import services, translate
+from . import i18n, services, translate
+from .i18n import N_, tr
 
 log = logging.getLogger(__name__)
 
 ABOUT = {
-    "claude": "Best at slang and difficult scripts. Needs a paid API key; with the "
-              "recommended model a request costs a fraction of a cent.",
-    "gemini": "Has a free tier: a free API key from Google AI Studio is enough. On the free tier "
-              "Google may use the pictures to improve its products.",
-    "ollama": "Free, nothing leaves your PC. Needs Ollama installed, a vision model pulled and a "
-              "graphics card with about 8 GB.",
+    "claude": N_("Best at slang and difficult scripts. Needs a paid API key; with the "
+              "recommended model a request costs a fraction of a cent."),
+    "gemini": N_("Has a free tier: a free API key from Google AI Studio is enough. On the free tier "
+              "Google may use the pictures to improve its products."),
+    "ollama": N_("Free, nothing leaves your PC. Needs Ollama installed, a vision model pulled and a "
+              "graphics card with about 8 GB."),
 }
 NOTICE = {
-    "claude": "The picture of the marked chat area (it can show player names and other players' messages) is sent "
-              "to Anthropic – with your own API key, at your own cost.",
-    "gemini": "The picture of the marked chat area (it can show player names and other players' messages) is sent "
-              "to Google. On the free tier Google may use it to improve its products, and humans may read it.",
+    "claude": N_("The picture of the marked chat area (it can show player names and other players' messages) is sent "
+              "to Anthropic – with your own API key, at your own cost."),
+    "gemini": N_("The picture of the marked chat area (it can show player names and other players' messages) is sent "
+              "to Google. On the free tier Google may use it to improve its products, and humans may read it."),
 }
 ERRORS = {
-    "key": "The API key is missing or not valid.",
-    "quota": "The service reports a limit or no credit.",
-    "net": "No connection to the service.",
-    "model": "Model not found.",
-    "server": "Ollama is not running.",
-    "refused": "The service declined the test.",
-    "answer": "The service's answer could not be read.",
-    "other": "Unexpected error (see log).",
+    "key": N_("The API key is missing or not valid."),
+    "quota": N_("The service reports a limit or no credit."),
+    "net": N_("No connection to the service."),
+    "model": N_("Model not found."),
+    "server": N_("Ollama is not running."),
+    "refused": N_("The service declined the test."),
+    "answer": N_("The service's answer could not be read."),
+    "other": N_("Unexpected error (see log)."),
 }
 
 
@@ -54,24 +55,29 @@ def wanted(settings) -> bool:
 
 
 class SetupWizard(QWidget):
-    def __init__(self, settings, done=None, make=None):
+    def __init__(self, settings, done=None, make=None, relang=None):
         super().__init__(None, Qt.WindowType.Window)
-        self.setWindowTitle("Fog Translate – setup")
+        self.setWindowTitle(tr("Fog Translate – setup"))
         self.settings = settings
         self._done = done or (lambda: None)
+        self._relang = relang or (lambda: None)       # the language was changed here: the main window follows
         self._make = make or services.make            # injectable for tests
         self._finished = False
         self._results: queue.Queue = queue.Queue()
         self._timer = QTimer(self, interval=150, timeout=self._pump)
+        self._build()
+        self.resize(560, 460)
+
+    def _build(self):
         self.pages = QStackedWidget()
         self.pages.addWidget(self._page_service())
         self.pages.addWidget(self._page_key())
         self.pages.addWidget(self._page_finish())
 
-        self.back_btn = QPushButton("Back", clicked=self.back)
-        self.next_btn = QPushButton("Next", clicked=self.next)
+        self.back_btn = QPushButton(tr("Back"), clicked=self.back)
+        self.next_btn = QPushButton(tr("Next"), clicked=self.next)
         self.next_btn.setDefault(True)
-        self.skip_btn = QPushButton("Skip setup", clicked=self.skip)
+        self.skip_btn = QPushButton(tr("Skip setup"), clicked=self.skip)
         buttons = QHBoxLayout()
         buttons.addWidget(self.skip_btn)
         buttons.addStretch(1)
@@ -80,8 +86,22 @@ class SetupWizard(QWidget):
         root = QVBoxLayout(self)
         root.addWidget(self.pages, 1)
         root.addLayout(buttons)
-        self.resize(560, 420)
         self._show_page(0)
+
+    def _language_changed(self, _index=None):
+        """Another language: the pages are built again (what was chosen so far is kept in the settings)."""
+        code = self.language.currentData()
+        if code == self.settings["ui_language"]:
+            return
+        self.settings["service"] = self.service()
+        self.settings["target"] = self.target.currentData()
+        self.settings["ui_language"] = code
+        self.settings.save()
+        i18n.set_language(code)
+        QWidget().setLayout(self.layout())             # the old pages go with this temporary parent
+        self._build()
+        self.setWindowTitle(tr("Fog Translate – setup"))
+        self._relang()
 
     # ---------------------------------------------------------------- pages
     def _title(self, text):
@@ -92,29 +112,41 @@ class SetupWizard(QWidget):
     def _page_service(self):
         page = QWidget()
         box = QVBoxLayout(page)
-        box.addWidget(self._title("1 of 3 · Which translation service?"))
-        intro = QLabel("Fog Translate sends a picture of the chat to a service that reads and translates it. "
-                       "Choose one – you can change it any time.")
+        box.addWidget(self._title(tr("1 of 3 · Which translation service?")))
+        top = QHBoxLayout()
+        top.addWidget(QLabel(tr("Language:")))
+        self.language = QComboBox()
+        self.language.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.language.addItem(tr("Automatic (Windows)"), "auto")
+        for code, name in i18n.LANGS.items():
+            self.language.addItem(name, code)
+        self.language.setCurrentIndex(max(0, self.language.findData(self.settings["ui_language"])))
+        self.language.activated.connect(self._language_changed)
+        top.addWidget(self.language)
+        top.addStretch(1)
+        box.addLayout(top)
+        intro = QLabel(tr("Fog Translate sends a picture of the chat to a service that reads and translates it. "
+                          "Choose one – you can change it any time."))
         intro.setWordWrap(True)
         box.addWidget(intro)
         self.group = QButtonGroup(self)
         self.radios = {}
         for sid, (label, _cloud) in services.SERVICES.items():
-            radio = QRadioButton(label)
+            radio = QRadioButton(tr(label))
             radio.setChecked(sid == self.settings["service"])
             self.group.addButton(radio)
             self.radios[sid] = radio
             box.addWidget(radio)
-            about = QLabel(ABOUT[sid])
+            about = QLabel(tr(ABOUT[sid]))
             about.setWordWrap(True)
             about.setContentsMargins(22, 0, 0, 8)
             box.addWidget(about)
         lang = QHBoxLayout()
-        lang.addWidget(QLabel("Translate to:"))
+        lang.addWidget(QLabel(tr("Translate to:")))
         self.target = QComboBox()
         self.target.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         for code, name in translate.LANGUAGES.items():
-            self.target.addItem("%s (%s)" % (name, code.upper()), code)
+            self.target.addItem("%s (%s)" % (tr(name), code.upper()), code)
         self.target.setCurrentIndex(list(translate.LANGUAGES).index(self.settings["target"]))
         lang.addWidget(self.target)
         lang.addStretch(1)
@@ -135,15 +167,15 @@ class SetupWizard(QWidget):
         row = QHBoxLayout()
         self.key = QLineEdit()
         self.key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.key.setPlaceholderText("Paste your API key")
-        self.test_btn = QPushButton("Test", clicked=self.test)
+        self.key.setPlaceholderText(tr("Paste your API key"))
+        self.test_btn = QPushButton(tr("Test"), clicked=self.test)
         row.addWidget(self.key, 1)
         row.addWidget(self.test_btn)
         box.addLayout(row)
         self.notice = QLabel()
         self.notice.setWordWrap(True)
         box.addWidget(self.notice)
-        self.accept = QCheckBox("I understand")
+        self.accept = QCheckBox(tr("I understand"))
         self.accept.toggled.connect(lambda _on: self._buttons())
         box.addWidget(self.accept)
         self.result = QLabel()
@@ -155,12 +187,13 @@ class SetupWizard(QWidget):
     def _page_finish(self):
         page = QWidget()
         box = QVBoxLayout(page)
-        box.addWidget(self._title("3 of 3 · Almost done"))
-        text = QLabel("Three steps are left, in the main window:<br><br>"
-                      "<b>1.</b> Open Dead by Daylight and go to a lobby where the chat is visible.<br>"
-                      "<b>2.</b> Click <b>Mark chat area</b>, drag a box around the whole chat and click <b>Save</b>.<br>"
-                      "<b>3.</b> Click <b>Start</b>.<br><br>"
-                      "Translations appear above the chat. Ctrl+Alt+T hides and shows them.")
+        box.addWidget(self._title(tr("3 of 3 · Almost done")))
+        text = QLabel("%s<br><br><b>1.</b> %s<br><b>2.</b> %s<br><br>%s<br><br>%s" % (
+            tr("Two steps are left, in the main window:"),
+            tr("Open Dead by Daylight and go to a lobby where the chat is visible."),
+            tr("Click “Mark chat area”, drag a box around the whole chat and click “Save”."),
+            tr("Fog Translate then starts by itself – from now on every time you open it."),
+            tr("Translations appear above the chat while it is visible. Ctrl+Alt+T hides and shows them.")))
         text.setTextFormat(Qt.TextFormat.RichText)
         text.setWordWrap(True)
         box.addWidget(text)
@@ -181,20 +214,22 @@ class SetupWizard(QWidget):
         service = self.service()
         cloud = services.is_cloud(service)
         name = services.SERVICES[service][0]
-        self.key_title.setText("<b style='font-size:16px'>2 of 3 · %s</b>" % ("API key for " + name if cloud else name))
+        name = tr(name)
+        self.key_title.setText("<b style='font-size:16px'>%s · %s</b>"
+                               % (tr("2 of 3"), tr("API key for %s") % name if cloud else name))
         if cloud:
             url = services.KEY_URL[service]
             stored = self.settings.has_stored_key(service)
-            self.key_help.setText('Get a key here: <a href="%s">%s</a><br>It is stored encrypted on this PC '
-                                  '(Windows DPAPI) and only ever sent to this service.%s'
-                                  % (url, url, "<br><b>A key is already saved</b> – leave the field empty to keep it."
-                                     if stored else ""))
-            self.notice.setText(NOTICE[service])
+            self.key_help.setText('%s <a href="%s">%s</a><br>%s%s' % (
+                tr("Get a key here:"), url, url,
+                tr("It is stored encrypted on this PC (Windows DPAPI) and only ever sent to this service."),
+                "<br><b>%s</b>" % tr("A key is already saved – leave the field empty to keep it.") if stored else ""))
+            self.notice.setText(tr(NOTICE[service]))
         else:
-            self.key_help.setText('Install Ollama from <a href="https://ollama.com">ollama.com</a>, then run '
-                                  '<code>ollama pull %s</code> in a command prompt. No key is needed.'
-                                  % self.settings["ollama_model"])
-            self.notice.setText("Nothing leaves your PC with Ollama.")
+            self.key_help.setText(tr("Install Ollama from %s, then run %s in a command prompt. No key is needed.") % (
+                '<a href="https://ollama.com">ollama.com</a>',
+                "<code>ollama pull %s</code>" % self.settings["ollama_model"]))
+            self.notice.setText(tr("Nothing leaves your PC with Ollama."))
         self.key.setVisible(cloud)
         self.accept.setVisible(cloud)
         self.accept.setChecked(self.settings.accepted(service) if cloud else True)
@@ -203,7 +238,7 @@ class SetupWizard(QWidget):
     def _buttons(self):
         index = self.pages.currentIndex()
         self.back_btn.setEnabled(index > 0)
-        self.next_btn.setText("Finish" if index == 2 else "Next")
+        self.next_btn.setText(tr("Finish") if index == 2 else tr("Next"))
         ok = True
         if index == 1 and services.is_cloud(self.service()):
             ok = self.accept.isChecked()
@@ -222,7 +257,7 @@ class SetupWizard(QWidget):
             if text:
                 s.set_api_key(service, text)
                 self.key.clear()
-                self.key.setPlaceholderText("saved")
+                self.key.setPlaceholderText(tr("saved"))
         s.save()
         return not services.is_cloud(service) or bool(s.api_key(service))
 
@@ -233,7 +268,7 @@ class SetupWizard(QWidget):
             self._show_page(1)
         elif index == 1:
             if not self._store():
-                self.result.setText("Please paste an API key first – or use “Skip setup” and add it later.")
+                self.result.setText(tr("Please paste an API key first – or use “Skip setup” and add it later."))
                 return
             self._show_page(2)
         else:
@@ -267,10 +302,10 @@ class SetupWizard(QWidget):
     # ---------------------------------------------------------------- test
     def test(self):
         if not self._store():
-            self.result.setText("Please paste an API key first.")
+            self.result.setText(tr("Please paste an API key first."))
             return
         self.test_btn.setEnabled(False)
-        self.result.setText("Testing …")
+        self.result.setText(tr("Testing …"))
         settings, make, put = self.settings, self._make, self._results.put
 
         def work():
@@ -294,8 +329,8 @@ class SetupWizard(QWidget):
             return
         self._timer.stop()
         if isinstance(outcome, translate.TranslateError):
-            self.result.setText("<b>Test failed:</b> " + ERRORS.get(outcome.kind, outcome.kind))
+            self.result.setText("<b>%s</b>" % (tr("Test failed: %s") % tr(ERRORS.get(outcome.kind, outcome.kind))))
         else:
             read, seconds, _cost = outcome
-            self.result.setText("<b>It works.</b> %d of 3 sample messages read in %.1f s." % (min(3, read), seconds))
+            self.result.setText("<b>%s</b> %s" % (tr("It works."), tr("%d of 3 sample messages read in %.1f s.") % (min(3, read), seconds)))
         self._buttons()
