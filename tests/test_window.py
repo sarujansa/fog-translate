@@ -168,3 +168,28 @@ def test_the_wheel_does_not_change_the_limit_without_focus(app):
     win.daily_cap.wheelEvent(ev)
     assert win.daily_cap.value() == before
     win.close()
+
+
+def test_switching_to_an_unconfirmed_service_while_running_stops(app, monkeypatch):
+    """Review 10.11.2026: a running session sent pictures to Gemini without its notice being confirmed."""
+    from fogtranslate import services
+
+    class Quiet:
+        def request(self, img):
+            raise AssertionError("nothing may be sent")
+    monkeypatch.setattr(services, "make", lambda settings: Quiet())
+    settings = Settings()
+    settings["region"] = [0.8, 0.5, 0.15, 0.2]
+    win = MainWindow(settings)
+    _pick(win, "ollama")
+    win.toggle()
+    assert win.running
+    _pick(win, "gemini")                              # notice never confirmed for Gemini
+    assert not win.running and win.looper is None
+    assert "confirm the notice" in win.status.text()
+    win.accept.setChecked(True)
+    win.toggle()
+    assert win.running
+    win.accept.setChecked(False)                      # unticked while running: stops as well
+    assert not win.running and win.looper is None
+    win.close()

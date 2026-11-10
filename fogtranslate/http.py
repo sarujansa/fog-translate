@@ -1,12 +1,13 @@
 """The one small HTTP helper for the services without an SDK (Gemini, Ollama) – standard library only.
 
 Redirects are refused (the services never need one, and a redirect could carry the key elsewhere); answers are
-capped at ``MAX_BYTES``.
+capped at ``MAX_BYTES``. Requests to this PC (Ollama) never go through a proxy: the picture must not leave the PC.
 """
 from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 MAX_BYTES = 4 * 1024 * 1024
@@ -17,7 +18,13 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def _opener():
+LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+
+def _opener(url: str = ""):
+    if urllib.parse.urlsplit(url).hostname in LOCAL_HOSTS:
+        # an empty ProxyHandler replaces the default one, which would use http_proxy / the Windows proxy
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
     return urllib.request.build_opener(_NoRedirect)
 
 
@@ -32,7 +39,7 @@ def request(method: str, url: str, headers: dict | None = None, body=None, timeo
     req = urllib.request.Request(url, data=data, method=method,
                                  headers={"Content-Type": "application/json", **(headers or {})})
     try:
-        with (opener or _opener()).open(req, timeout=timeout) as r:
+        with (opener or _opener(url)).open(req, timeout=timeout) as r:
             status, raw = r.status, r.read(MAX_BYTES + 1)
     except urllib.error.HTTPError as e:
         status, raw = e.code, (e.read(MAX_BYTES + 1) if e.fp else b"")

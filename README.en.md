@@ -49,7 +49,8 @@ reliably but takes longer.
 | **Gemini** (Google) | free API key from https://aistudio.google.com/apikey | free tier (about 10 requests/min, daily quota; availability depends on your region) | sent to Google; on the free tier Google may use it to improve its products |
 | **Ollama** (local) | [Ollama](https://ollama.com) + a vision model, e.g. `ollama pull qwen2.5vl:7b` (≈ 6 GB, GPU with 8 GB+) or `gemma3:4b` | free | stays on your PC |
 
-With Ollama the program only talks to `127.0.0.1` (port configurable, default 11434). "Load local models" fills
+With Ollama the program only talks to `127.0.0.1` (port configurable, default 11434), never through a proxy –
+the picture never leaves your PC. "Load local models" fills
 the list with your installed models.
 
 ## Installing

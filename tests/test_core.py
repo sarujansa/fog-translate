@@ -574,3 +574,101 @@ def test_after_a_failed_request_the_chat_is_sent_again():
     eng.look(GAME, True, lambda box: _chat_lines(one))
     eng.look(GAME, True, lambda box: _chat_lines(one))
     assert len(eng.worker.sent) == 3 and eng.worker.sent[-1].shape[0] == 260   # everything again
+
+
+def test_marking_the_area_again_while_pictures_wait_does_not_stop_the_translation():
+    """Review 10.11.2026: a waiting picture of the old width made every later look fail (np.vstack)."""
+    eng, t = _engine(min_gap_s=5.0)
+    base = list(CHAT)
+    one = base[1:] + ["Nea: kto kempit na hukah"]
+    for frame in (base, base):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    eng.worker.busy = False
+    for frame in (one, one):                               # waits for the gap
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    assert eng._pending is not None
+    eng.new_area()                                         # marked again: a narrower area
+    t[0] = 6.0
+    narrow = ["Meg: hi", "Nea: privet"]
+    for _ in range(3):
+        eng.look(GAME, True, lambda box: _chat_lines(narrow, size=(300, 260)))
+    assert eng.worker.sent[-1].shape[1] == 300
+
+
+def test_a_resized_window_drops_the_waiting_pictures_of_the_old_size():
+    eng, t = _engine(min_gap_s=5.0)
+    base = list(CHAT)
+    one = base[1:] + ["Nea: kto kempit na hukah"]
+    for frame in (base, base, one, one):
+        eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
+    t[0] = 6.0
+    for _ in range(3):                                     # no new_area(): only the size changed
+        eng.look(GAME, True, lambda box: _chat_lines(one, size=(300, 260)))
+    assert eng.worker.sent[-1].shape[1] == 300
+
+
+def test_the_daily_cap_counts_the_request_still_under_way():
+    eng, t = _engine(min_gap_s=0.0, daily_cap=1)
+    eng.look(GAME, True, lambda box: _chat(1))
+    eng.look(GAME, True, lambda box: _chat(1))
+    assert len(eng.worker.sent) == 1                       # answered, but not yet counted by the window
+    t[0] = 10.0
+    for seed in (2, 2, 2):
+        eng.look(GAME, True, lambda box, s=seed: _chat(s))
+    assert len(eng.worker.sent) == 1 and eng.status == "cap"
+
+
+def test_answers_the_service_charged_for_count_towards_the_daily_cap():
+    eng, _ = _engine()
+    day = "2026-11-09"
+    eng.answer(TranslateError("answer"))
+    eng.answer(TranslateError("refused"))
+    assert eng.settings.requests_today(day) == 2
+    eng.answer(TranslateError("net"))                      # nothing reached the service
+    assert eng.settings.requests_today(day) == 2
+
+
+def test_requests_to_this_pc_never_use_a_proxy(monkeypatch):
+    import urllib.request
+    from fogtranslate import http
+    monkeypatch.setenv("http_proxy", "http://proxy.example:8080")
+    monkeypatch.setenv("https_proxy", "http://proxy.example:8080")
+
+    def proxies(opener):
+        return [h.proxies for h in opener.handlers if isinstance(h, urllib.request.ProxyHandler)]
+    assert proxies(http._opener("https://generativelanguage.googleapis.com/x"))[0].get("https")  # the env counts
+    assert not any(proxies(http._opener("http://127.0.0.1:11434/api/chat")))
+    assert not any(proxies(http._opener("http://localhost:11434/api/tags")))
+
+
+def test_too_many_windows_above_dbd_count_as_covered(monkeypatch):
+    from fogtranslate import window
+    fake = SimpleNamespace(GetWindow=lambda h, rel: h + 1, IsWindowVisible=lambda h: 0)
+    monkeypatch.setattr(window, "IS_WIN", True)
+    monkeypatch.setattr(window, "user32", fake, raising=False)
+    for name, value in (("GW_HWNDPREV", 3), ("GWL_EXSTYLE", -20), ("WS_EX_TRANSPARENT", 0x20),
+                        ("WS_EX_LAYERED", 0x80000)):
+        monkeypatch.setattr(window, name, value, raising=False)
+    assert window.windows_above(1, limit=50) is None       # the walk never reached the top
+    game = SimpleNamespace(hwnd=1)
+    assert window.region_free(game, (0, 0, 10, 10)) is False
+    fake.GetWindow = lambda h, rel: h + 1 if h < 20 else 0
+    assert window.windows_above(1, limit=50) == []
+    assert window.region_free(game, (0, 0, 10, 10)) is True
+
+
+def test_a_stopped_look_thread_does_not_report_its_failed_start():
+    import queue
+    from fogtranslate.looper import Looper
+
+    eng, _ = _engine()
+    q = queue.Queue()
+
+    def no_key():
+        loop.stop()                                        # settings changed while it was starting
+        raise TranslateError("key")
+
+    loop = Looper(eng, no_key, q.put, 0.2)
+    loop.start()
+    loop.join(2)
+    assert q.empty()

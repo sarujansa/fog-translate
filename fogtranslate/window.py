@@ -140,10 +140,11 @@ def _rect(hwnd):
     return rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top
 
 
-def windows_above(hwnd, limit: int = 500) -> list:
+def windows_above(hwnd, limit: int = 500) -> list | None:
     """Screen rects of the windows above ``hwnd`` in the Z order that can hide part of it: visible, not
     minimised, not cloaked, not click-through (overlays like ours), not the taskbar. Window-manager
-    information only (Z order, style, position); no process is touched."""
+    information only (Z order, style, position); no process is touched. ``None`` when more than ``limit``
+    windows lie above: the walk goes upwards, so the window in front would be the one never looked at."""
     if not IS_WIN or not hwnd:
         return []
     out = []
@@ -162,7 +163,7 @@ def windows_above(hwnd, limit: int = 500) -> list:
         except OSError:
             pass
         h = user32.GetWindow(h, GW_HWNDPREV)
-    return out
+    return None if h else out
 
 
 def overlaps(box, rects) -> bool:
@@ -175,4 +176,5 @@ def region_free(game: GameWindow | None, box) -> bool:
     """Nothing lies over ``box`` of the game window – then the screen shows the chat even with DBD behind."""
     if game is None or box is None:
         return False
-    return not overlaps(box, windows_above(game.hwnd))
+    above = windows_above(game.hwnd)
+    return above is not None and not overlaps(box, above)       # not walked to the end → counts as covered
