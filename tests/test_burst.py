@@ -12,7 +12,7 @@ import pytest
 from fogtranslate.config import Settings
 from fogtranslate.engine import BACKLOG_MAX, Engine
 from fogtranslate.translate import Result
-from test_core import _chat_lines
+from test_core import READ, _chat_lines
 
 WORDS = "gen hook heal camp tunnel gg wp noob killer surv flash pallet loop save run basement exit gate totem".split()
 H, LINE, VISIBLE = 260, 22, 11
@@ -62,7 +62,7 @@ def simulate(rate, n, latency, service="claude"):
             done_at = t[0] + latency
         if done_at is not None and t[0] >= done_at:
             worker.busy = False
-            eng.answer(Result([], 0.0))
+            eng.answer(Result([READ], 0.0))
             done_at = None
         t[0] += 0.5
     return sorted(set(range(n)) - covered), stats

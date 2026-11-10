@@ -23,7 +23,9 @@ side. Unofficial fan tool, not affiliated with Behaviour Interactive.
 4. The service reads every message, joins wrapped lines, detects the language and translates it into your target
    language, returning name, original, language and translation.
    When the chat moves fast, the program keeps intermediate pictures and sends them stacked with the next request,
-   so messages that already scrolled out of the area are not lost.
+   so messages that already scrolled out of the area are not lost. If the area shows no chat lines (chat closed, the
+   game behind it), nothing is sent; if the service reads no message at all in a picture, the program waits before
+   the next request (15 s, then twice as long each time, 5 min at most).
 5. Messages already shown are recognised and not shown again; a better reading of a message replaces the old one.
 6. Foreign messages appear in the overlay above the chat (language, name, translation, original in small print)
    and in the list in the main window. The overlay fades after 25 s without anything new.
