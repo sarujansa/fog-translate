@@ -40,8 +40,8 @@ Abhängigkeiten in `THIRD_PARTY.md` eintragen (Wächter `test_every_package_is_l
 - **.exe/Setup** (0.8): `installer/fogtranslate.spec` (PyInstaller 6.22.3 fest, `requirements-build.txt` mit
   SHA-256), `installer/fogtranslate.iss` (Inno Setup 7.1.1 fest + Prüfsumme, nur für den Benutzer, keine
   Admin-Rechte, `{localappdata}\Programs\Fog Translate`). `.github/workflows/build.yml`: Bau, `--selftest` der .exe,
-  Setup still installieren/prüfen/deinstallieren; Job `release` (einziger mit `contents: write`) nur bei Push auf
-  `main` und nur wenn es `v<Version>` noch nicht gibt. Die .exe aktualisiert nie selbst: „Check for updates“ liest
+  Setup still installieren/prüfen/deinstallieren; Job `release` (einziger mit `contents: write`/`id-token`/`attestations`, Herkunftsnachweis per
+  `attest-build-provenance`) nur bei Push auf `main` und nur wenn es `v<Version>` noch nicht gibt. Die .exe aktualisiert nie selbst: „Check for updates“ liest
   die Versionszeile und öffnet `update.RELEASES_URL`.
 - **Hotkey** (0.9, `hotkey.py`): nur `RegisterHotKey` für die eine eingestellte Kombination (`hide_hotkey`, Standard
   Strg+Alt+T; braucht Strg/Alt/Win oder eine F-Taste) – Windows meldet sie dem eigenen Programm über Qts nativen
