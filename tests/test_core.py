@@ -683,3 +683,39 @@ def test_chinese_japanese_and_korean_are_target_languages(tmp_path):
         s["target"] = code
         s.save()
         assert Settings(str(tmp_path))["target"] == code          # kept, not reset to German
+
+
+# ---------------------------------------------------------------- only while the chat is visible (0.9.7)
+def test_the_chat_counts_as_seen_only_while_the_area_shows_text():
+    from fogtranslate.engine import GONE_LOOKS
+    eng, _ = _engine()
+    empty = np.zeros_like(_chat(1))
+    assert not eng.chat_seen and not eng.chat_shown()
+    eng.look(GAME, True, lambda box: _chat(1))
+    assert eng.chat_seen and eng.chat_shown()
+    eng.look(GAME, True, lambda box: empty)
+    assert eng.chat_seen                               # one look without text is not "gone" yet
+    for _ in range(GONE_LOOKS - 1):
+        eng.look(GAME, True, lambda box: empty)
+    assert not eng.chat_seen and not eng.chat_shown()
+    eng.look(GAME, True, lambda box: _chat(1))
+    assert eng.chat_shown()                            # back at once when the chat is
+
+
+def test_no_chat_is_seen_without_the_game_or_under_another_window():
+    eng, _ = _engine()
+    eng.look(GAME, True, lambda box: _chat(1))
+    eng.look(GAME, False, lambda box: _chat(1), region_free=lambda g, box: False)
+    assert eng.status == "covered" and not eng.chat_seen
+    eng.look(GAME, True, lambda box: _chat(1))
+    eng.look(None, False, lambda box: _chat(1))
+    assert eng.status == "no_game" and not eng.chat_seen
+    eng, _ = _engine(read_background=False)
+    eng.look(GAME, True, lambda box: _chat(1))
+    eng.look(GAME, False, lambda box: _chat(1))
+    assert eng.status == "background" and not eng.chat_seen
+
+
+def test_without_the_setting_translations_stay_when_the_chat_is_gone():
+    eng, _ = _engine(hide_without_chat=False)
+    assert eng.chat_shown() and not eng.chat_seen

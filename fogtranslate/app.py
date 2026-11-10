@@ -27,6 +27,7 @@ STATUS = {
     "covered": "A window covers the chat – paused until it is visible again.",
     "starting": "Starting …",
     "watching": "Watching the chat …",
+    "no_chat": "Waiting for the chat … no text found in the marked area (never there? mark it again)",
     "asking": "Translating …",
     "cap": "Daily request limit reached – paused until tomorrow.",
     "error": "Error",
@@ -188,6 +189,14 @@ class MainWindow(QWidget):
         self.background.setChecked(bool(s["read_background"]))
         self.background.toggled.connect(self._settings_changed)
         root.addWidget(self.background)
+        self.auto_start = QCheckBox("Start automatically when Fog Translate opens")
+        self.auto_start.setChecked(bool(s["auto_start"]))
+        self.auto_start.toggled.connect(self._auto_changed)
+        root.addWidget(self.auto_start)
+        self.only_chat = QCheckBox("Show translations only while the chat is visible")
+        self.only_chat.setChecked(bool(s["hide_without_chat"]))
+        self.only_chat.toggled.connect(self._auto_changed)
+        root.addWidget(self.only_chat)
         self.hide_caps = QCheckBox("Hide the translation in screenshots and recordings")
         self.hide_caps.setChecked(bool(s["hide_in_captures"]))
         self.hide_caps.toggled.connect(self._settings_changed)
@@ -222,6 +231,28 @@ class MainWindow(QWidget):
         self._quitting = False
         self.resize(560, 560)
         self._service_ui()
+
+    def _auto_changed(self, _on=None):
+        """Neither box changes what is sent, so the look thread keeps running."""
+        self.settings["auto_start"] = self.auto_start.isChecked()
+        self.settings["hide_without_chat"] = self.only_chat.isChecked()
+        self.settings.save()
+        if self.running:
+            self._refresh_overlay()
+
+    def can_auto_start(self) -> bool:
+        """Start by itself only when a click on Start would work: area marked, notice confirmed, key there."""
+        s = self.settings
+        service = s["service"]
+        return bool(s["auto_start"] and not self.running and s["region"] is not None and s.accepted(service)
+                    and (not services.is_cloud(service) or s.api_key(service)))
+
+    def auto_start_now(self) -> bool:
+        if not self.can_auto_start():
+            return False
+        log.info("Automatic start")
+        self.toggle()
+        return self.running
 
     def _look_changed(self, _value=None):
         self.settings["font_px"] = int(self.font_px.value())
@@ -568,6 +599,7 @@ class MainWindow(QWidget):
             self.settings["region"] = list(rel)
             self.settings.save()
             self.engine.new_area()            # also drops waiting pictures of the old size
+            self.auto_start_now()
         self._refresh()
 
     # ---------------------------------------------------------------- loop
@@ -649,7 +681,8 @@ class MainWindow(QWidget):
 
     def _refresh_overlay(self):
         box = self.engine.region_on_screen(self.game)
-        lines = self.engine.visible() if self.running and box is not None and not self.overlay_hidden else []
+        lines = (self.engine.visible() if self.running and box is not None and not self.overlay_hidden
+                 and self.engine.chat_shown() else [])
         if not lines or self.picker is not None:
             self.overlay.hide()
             return
@@ -669,7 +702,7 @@ class MainWindow(QWidget):
         elif self.running and e.status == "watching":
             from .change import MIN_TEXT_PX
             if e.gate.stats.get("text_px", MIN_TEXT_PX) < MIN_TEXT_PX:
-                text = "Watching the chat … no text found in the marked area (mark it again?)"
+                text = STATUS["no_chat"]
         now = datetime.now()
         if getattr(self, "_test_until", 0) > now.timestamp():
             text = self._test_text                       # the test's result stays readable for a moment
@@ -732,4 +765,6 @@ def run(argv=None) -> int:
     from . import wizard
     if wizard.wanted(settings):
         win.open_setup()
+    else:
+        win.auto_start_now()
     return app.exec()

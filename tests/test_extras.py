@@ -2,6 +2,7 @@
 import ctypes
 import sys
 import time
+import types
 
 import pytest
 
@@ -139,3 +140,62 @@ def test_closing_goes_to_the_tray_only_when_asked_and_possible(app):
 def test_the_sample_picture_shows_text_the_gate_would_send():
     from fogtranslate.change import MIN_TEXT_PX, text_mask
     assert text_mask(translate.sample_picture()).sum() > MIN_TEXT_PX
+
+
+# ---------------------------------------------------------------- automatic start, only while the chat shows (0.9.7)
+def test_it_starts_by_itself_only_when_start_would_work(app, monkeypatch):
+    s = Settings()
+    win = MainWindow(s)
+    started = []
+    monkeypatch.setattr(win, "_start_looper", lambda: started.append(1))
+    assert not win.auto_start_now()                    # no area marked
+    s["region"] = [0.1, 0.5, 0.3, 0.3]
+    s["service"] = "claude"
+    assert not win.auto_start_now()                    # notice not confirmed
+    s.set_accepted("claude", True)
+    assert not win.auto_start_now()                    # no key
+    s.session_keys["claude"] = "k"
+    s["auto_start"] = False
+    assert not win.auto_start_now() and not started    # switched off
+    s["auto_start"] = True
+    assert win.auto_start_now() and win.running and started == [1]
+    assert not win.auto_start_now() and started == [1]     # already running
+    win.toggle()
+    win.close()
+
+
+def test_marking_the_area_starts_by_itself(app, monkeypatch):
+    s = Settings()
+    s["service"] = "ollama"
+    win = MainWindow(s)
+    started = []
+    monkeypatch.setattr(win, "_start_looper", lambda: started.append(1))
+    win._picked(None)
+    assert not win.running
+    win._picked((0.1, 0.5, 0.3, 0.3))
+    assert win.running and started == [1]
+    win.toggle()
+    win.close()
+
+
+def test_translations_are_shown_only_while_the_chat_is_seen(app):
+    s = Settings()
+    s["region"] = [0.1, 0.5, 0.3, 0.3]
+    win = MainWindow(s)
+    win.running = True
+    win.game = types.SimpleNamespace(client=(0, 0, 1920, 1080), minimized=False)
+    win.engine.answer(Result([ChatLine("Meg", "привет", "ru", "hallo", True)], 0.0))
+    win._refresh_overlay()
+    assert not win.overlay.isVisible()                 # the chat was never seen
+    win.engine.chat_seen = True
+    win._refresh_overlay()
+    assert win.overlay.isVisible()
+    win.engine.chat_seen = False
+    win._refresh_overlay()
+    assert not win.overlay.isVisible()                 # gone with the chat
+    win.only_chat.setChecked(False)                    # switched off: as before, until the time runs out
+    assert Settings()["hide_without_chat"] is False and win.overlay.isVisible()
+    win.auto_start.setChecked(False)
+    assert Settings()["auto_start"] is False
+    win.running = False
+    win.close()

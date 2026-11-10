@@ -22,6 +22,7 @@ SEAM = 6                         # dark rows between stacked pictures
 ERROR_WAIT_S = 10.0              # after any other failed request
 QUOTA_WAIT_S = 60.0              # after a "limit reached" answer, wait at least this long
 SERVICE_GAP_S = {"gemini": 6.5}  # Gemini's free tier allows about 10 requests a minute
+GONE_LOOKS = 2                   # looks in a row without chat text before the chat counts as gone
 BILLED_ERRORS = ("answer", "refused")   # the service answered (and charged), but nothing usable came back
 
 
@@ -56,6 +57,8 @@ class Engine:
         self.last_counts = {}       # numbers of the last answer, for the log (never text)
         self.last_seconds = 0.0     # how long the last answer took
         self.last_sent = None        # the last picture sent (in memory only) – "Letzten Ausschnitt zeigen"
+        self.chat_seen = False       # the marked area shows chat text right now (the overlay follows this)
+        self._gone = 0               # looks in a row without chat text
 
     @_locked
     def region_on_screen(self, game) -> tuple[int, int, int, int] | None:
@@ -73,19 +76,23 @@ class Engine:
         it – otherwise the picture could be another program's window, and that must never be sent."""
         if self.settings["region"] is None:
             self.status = "no_region"
+            self._chat_gone()
             return
         if game is None or game.minimized:
             self.status = "no_game"
             self.gate.reset()
             self._ref = None
+            self._chat_gone()
             return
         box = self.region_on_screen(game)
         if not in_front:
             if not self.settings["read_background"]:
                 self.status = "background"
+                self._chat_gone()
                 return
             if region_free is None or not region_free(game, box):
                 self.status = "covered"
+                self._chat_gone()
                 return
         img = grab(box)
         if img is None:
@@ -96,6 +103,12 @@ class Engine:
             self.status = "watching"
         fired = self.gate.look(img)
         mask = self.gate.last_mask
+        if self.gate.stats.get("text_px", 0) >= MIN_TEXT_PX:
+            self.chat_seen, self._gone = True, 0
+        else:                                # one look without text can be a line scrolling or the chat fading in
+            self._gone += 1
+            if self._gone >= GONE_LOOKS:
+                self.chat_seen = False
         # A fast chat: before lines scroll out of the area, keep a picture of them for the next request
         # (simulated 10.11.2026: 6 messages/s with a 4 s answer lost 27 of 60 without this). ``_ref`` is the text
         # of the oldest picture not yet safe; "far" = the chat moved KEEP_AT of the area since then.
@@ -114,6 +127,17 @@ class Engine:
         elif far:
             self._keep(img, mask)            # a request is under way or the text never settles
         self._try_send()
+
+    def _chat_gone(self):
+        """The area is not looked at (no game, covered, in the background): nothing of the chat is seen."""
+        self.chat_seen, self._gone = False, 0
+
+    @_locked
+    def chat_shown(self) -> bool:
+        """Whether translations may be on screen: always without ``hide_without_chat``, else only while the marked
+        area shows the chat (in a match, in menus without chat or with a window over it there is nothing to
+        translate, and the overlay would cover something else)."""
+        return self.chat_seen or not self.settings["hide_without_chat"]
 
     def _moved_far(self, mask, height: int) -> bool:
         ref = self._ref
