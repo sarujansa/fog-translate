@@ -111,6 +111,16 @@ class ChangeGate:
         self._last = self._sent = None
         self._same = self._waiting = 0
 
+    @property
+    def last_mask(self):
+        """The text of the look just fed."""
+        return self._last
+
+    def mark_sent(self, mask):
+        """This text is taken care of (kept for the next request) although ``look`` did not hand it out."""
+        self._sent = mask
+        self._waiting = 0
+
     def look(self, img: np.ndarray) -> bool:
         """Feed one look; True when this picture should be sent now."""
         m = text_mask(img)
@@ -141,16 +151,15 @@ MAX_LOST = 0.06          # … and at most this share of it may be unexplained
 MARGIN = 0.06            # rows above the first new text that are sent along (part of a line for context)
 
 
-def new_rows(before: np.ndarray | None, now: np.ndarray) -> int:
-    """First row of ``now`` (a text mask) that shows text ``before`` did not have – after finding how far the
-    chat scrolled up (DBD pushes old lines up when a new one comes). 0 = send the whole area (first look, no
-    trustworthy alignment, or everything is new)."""
+def scroll_shift(before: np.ndarray | None, now: np.ndarray) -> int | None:
+    """How many rows the chat scrolled up between two text masks (0 = not at all); None when no shift explains the
+    earlier text (too far apart, or something else is shown)."""
     if before is None or before.shape != now.shape:
-        return 0
+        return None
     h = now.shape[0]
     total = int(np.count_nonzero(before))
     if total < MIN_TEXT_PX:
-        return 0
+        return None
     grown_now = _grow(now)
     best, best_share = None, 1.0
     for s in range(0, h):
@@ -162,7 +171,18 @@ def new_rows(before: np.ndarray | None, now: np.ndarray) -> int:
         if share < best_share:
             best, best_share = s, share          # the scroll that explains the earlier text best
     if best is None or best_share > MAX_LOST:
+        return None
+    return best
+
+
+def new_rows(before: np.ndarray | None, now: np.ndarray) -> int:
+    """First row of ``now`` (a text mask) that shows text ``before`` did not have – after finding how far the
+    chat scrolled up (DBD pushes old lines up when a new one comes). 0 = send the whole area (first look, no
+    trustworthy alignment, or everything is new)."""
+    best = scroll_shift(before, now)
+    if best is None:
         return 0
+    h = now.shape[0]
     moved = np.zeros_like(before)
     moved[:h - best] = before[best:]
     fresh = now & ~_grow(moved)

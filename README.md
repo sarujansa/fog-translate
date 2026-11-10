@@ -23,6 +23,8 @@ nebeneinander.
    Streifen mit den neuen Zeilen – das Programm erkennt, wie weit der Chat gescrollt ist.
 4. Der Dienst liest jede Nachricht, fügt umgebrochene Zeilen zusammen, erkennt die Sprache und übersetzt in deine
    Zielsprache; zurück kommen Name, Original, Sprache und Übersetzung.
+   Läuft der Chat schnell, hebt das Programm Zwischenbilder auf und schickt sie gestapelt mit der nächsten Anfrage,
+   damit keine Nachricht verloren geht, die schon aus dem Feld gescrollt ist.
 5. Schon gezeigte Nachrichten werden erkannt und nicht doppelt gezeigt; eine bessere Lesung ersetzt die alte.
 6. Fremdsprachige Nachrichten erscheinen im Overlay über dem Chat (Sprache, Name, Übersetzung, Original klein) und
    in der Liste im Hauptfenster. Das Overlay blendet nach 25 s ohne Neues aus.

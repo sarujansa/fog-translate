@@ -11,11 +11,14 @@ import time
 from datetime import datetime
 
 from . import geometry
-from .change import ChangeGate
+from .change import MIN_TEXT_PX, ChangeGate, differs, scroll_shift
 from .lines import ChatLine, Transcript
 from .translate import Result, TranslateError
 
 KEEP_SHOWN = 6
+KEEP_AT = 0.35                   # scrolled this share of the area since the last kept picture → keep another one
+BACKLOG_MAX = 4                  # kept pictures waiting for the next request (older ones are dropped)
+SEAM = 6                         # dark rows between stacked pictures
 ERROR_WAIT_S = 10.0              # after any other failed request
 QUOTA_WAIT_S = 60.0              # after a "limit reached" answer, wait at least this long
 SERVICE_GAP_S = {"gemini": 6.5}  # Gemini's free tier allows about 10 requests a minute
@@ -46,6 +49,8 @@ class Engine:
         self._last_request = -1e9
         self._not_before = -1e9      # after a limit answer
         self._pending = None
+        self._backlog: list = []     # earlier pictures whose lines may have scrolled out of the current one
+        self._ref = None             # text of the newest picture that is kept or sent
         self.last_counts = {}       # numbers of the last answer, for the log (never text)
         self.last_seconds = 0.0     # how long the last answer took
         self.last_sent = None        # the last picture sent (in memory only) – "Letzten Ausschnitt zeigen"
@@ -70,6 +75,7 @@ class Engine:
         if game is None or game.minimized:
             self.status = "no_game"
             self.gate.reset()
+            self._ref = None
             return
         box = self.region_on_screen(game)
         if not in_front:
@@ -84,17 +90,60 @@ class Engine:
             return
         if self.status in ("idle", "no_game", "background", "covered", "no_region"):
             self.status = "watching"
-        if not self.gate.look(img):
-            if self._pending is not None:
-                self._try_send()
-            return
-        top = self.gate.crop_top
+        fired = self.gate.look(img)
+        mask = self.gate.last_mask
+        # A fast chat: before lines scroll out of the area, keep a picture of them for the next request
+        # (simulated 10.11.2026: 6 messages/s with a 4 s answer lost 27 of 60 without this). ``_ref`` is the text
+        # of the oldest picture not yet safe; "far" = the chat moved KEEP_AT of the area since then.
+        far = self._moved_far(mask, img.shape[0])
         if self._pending is not None:
-            top = 0              # an earlier change is still unsent: its lines are only in the whole picture
-        self._pending = img[top:] if 0 < top < img.shape[0] - 8 else img     # only the new lines
+            if far:
+                self._keep(img, mask)        # the unsent picture goes to the backlog, this one is the new one
+            elif fired:
+                self._pending = img          # still shows the unsent lines (moved less than KEEP_AT)
+            self._try_send()
+            return
+        if fired:
+            top = self.gate.crop_top
+            self._pending = img[top:] if 0 < top < img.shape[0] - 8 else img     # only the new lines
+            self._ref = mask
+        elif far:
+            self._keep(img, mask)            # a request is under way or the text never settles
         self._try_send()
 
+    def _moved_far(self, mask, height: int) -> bool:
+        ref = self._ref
+        if ref is None or mask is None or int(ref.sum()) < MIN_TEXT_PX or int(mask.sum()) < MIN_TEXT_PX:
+            return False
+        if not differs(ref, mask):
+            return False
+        shift = scroll_shift(ref, mask)
+        return shift is None or shift >= KEEP_AT * height
+
+    def _keep(self, img, mask):
+        """The unsent picture moves to the backlog, the current one becomes the pending one."""
+        if self._pending is not None:
+            self._backlog.append(self._pending)
+            del self._backlog[:-BACKLOG_MAX]
+        self._pending = img
+        self._ref = mask
+        self.gate.mark_sent(mask)
+
+    def _stacked(self):
+        """Backlog (oldest first) and the pending picture as one picture, top to bottom."""
+        if not self._backlog:
+            return self._pending
+        import numpy as np
+        parts = []
+        for part in self._backlog + [self._pending]:
+            if parts:
+                parts.append(np.zeros((SEAM, part.shape[1], 3), part.dtype))
+            parts.append(part)
+        return np.vstack(parts)
+
     def _try_send(self):
+        if self._pending is None:
+            return
         t = self.clock()
         gap = max(float(self.settings["min_gap_s"]), SERVICE_GAP_S.get(self.settings["service"], 0.0))
         if self.worker.busy or t - self._last_request < gap or t < self._not_before:
@@ -103,11 +152,14 @@ class Engine:
         if self.settings.requests_today(day) >= int(self.settings["daily_cap"]):
             self.status = "cap"
             self._pending = None
+            self._backlog = []
             return
-        if self.worker.submit(self._pending):
-            self.last_sent = self._pending
+        picture = self._stacked()
+        if self.worker.submit(picture):
+            self.last_sent = picture
             self._last_request = t
             self._pending = None
+            self._backlog = []
             self.status = "asking"
 
     @_locked
@@ -122,6 +174,8 @@ class Engine:
             # again – after a pause, so a lasting error (no key, no network) is not hammered every 2 s
             self.gate.reset()
             self._pending = None
+            self._backlog = []
+            self._ref = None
             wait = QUOTA_WAIT_S if outcome.kind == "quota" else ERROR_WAIT_S
             self._not_before = self.clock() + wait
             return False
