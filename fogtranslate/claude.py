@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import threading
 
 from .translate import MAX_TOKENS_DEFAULT, SCHEMA, SYSTEM, Result, TranslateError, answer_lines, instruction, png_bytes
 
@@ -15,6 +16,16 @@ DEFAULT_MODEL = "claude-opus-5-5"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 FALLBACK_MODELS = ("claude-opus-5-5", "claude-sonnet-5-5")   # models that take the server-side fallbacks
 TIMEOUT_S = 60.0
+_IMPORT_LOCK = threading.Lock()
+
+
+def sdk():
+    """The ``anthropic`` package, imported under a lock: two threads importing it for the first time at once
+    (a look thread restarted while the old one still starts) hit pydantic's lazy imports half-initialised –
+    "cannot import name … from partially initialized module" (seen in CI, 10.11.2026)."""
+    with _IMPORT_LOCK:
+        import anthropic
+    return anthropic
 
 
 def cost_usd(model: str, usage) -> float:
@@ -33,7 +44,7 @@ class Translator:
         self.model = model if model in MODELS else DEFAULT_MODEL
         self.target = target
         if client is None:
-            import anthropic
+            anthropic = sdk()
             client = anthropic.Anthropic(api_key=api_key, timeout=TIMEOUT_S, max_retries=1)
         self._client = client
 
@@ -63,7 +74,7 @@ class Translator:
 
 def _error(e: Exception) -> TranslateError:
     try:
-        import anthropic
+        anthropic = sdk()
     except ImportError:                              # pragma: no cover
         return TranslateError("other", type(e).__name__)
     if isinstance(e, (anthropic.AuthenticationError, anthropic.PermissionDeniedError)):

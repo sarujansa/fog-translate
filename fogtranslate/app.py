@@ -435,9 +435,11 @@ class MainWindow(QWidget):
                              own_rects=lambda: [r for r in (overlay.rect_on_screen,) if r])
         self.looper.start()
 
-    def _stop_looper(self):
+    def _stop_looper(self, wait: float = 0.0):
         if self.looper is not None:
             self.looper.stop()
+            if wait:
+                self.looper.join(wait)           # closing: let it end before the program does
             self.looper = None
 
     def _start_worker(self):            # settings changed while running
@@ -520,7 +522,7 @@ class MainWindow(QWidget):
                               spent))
 
     def closeEvent(self, event):
-        self._stop_looper()
+        self._stop_looper(wait=2.0)
         self.overlay.close()
         super().closeEvent(event)
 

@@ -141,3 +141,21 @@ def test_keys_are_kept_per_service(monkeypatch):
     s.set_api_key("claude", "sk-ant-1")
     assert s.api_key("claude") == "sk-ant-1"
     assert s.api_key("gemini") == "from-env" and s.api_key("ollama") == ""
+
+
+def test_the_sdk_is_imported_under_one_lock():
+    """Two look threads importing anthropic at once broke pydantic's lazy imports (CI, 10.11.2026)."""
+    import threading
+    from fogtranslate import claude
+    seen = []
+
+    def load():
+        seen.append(claude.sdk().__name__)
+
+    threads = [threading.Thread(target=load) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    assert seen == ["anthropic"] * 4
+    assert isinstance(claude._IMPORT_LOCK, type(threading.Lock()))
