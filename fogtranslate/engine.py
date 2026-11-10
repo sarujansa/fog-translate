@@ -86,7 +86,8 @@ class Engine:
             if self._pending is not None:
                 self._try_send()
             return
-        self._pending = img
+        top = self.gate.crop_top
+        self._pending = img[top:] if 0 < top < img.shape[0] - 8 else img     # only the new lines
         self._try_send()
 
     def _try_send(self):

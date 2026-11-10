@@ -15,10 +15,10 @@ side. Unofficial fan tool, not affiliated with Behaviour Interactive.
 
 1. **Mark chat area** takes a still picture of the DBD window; you drag a box around the chat and click **Save**.
    The area is stored relative to the game window, so it survives another window size.
-2. After **Start**, the program looks at that area about once a second (screen pixels only).
+2. After **Start**, the program looks at that area twice a second (screen pixels only).
 3. It compares only the **text** in the area (bright, sharp strokes on the dark chat panel), so the moving lobby
    behind the chat does not count. When the text has changed, the picture of the area is sent to the chosen
-   service – at most every 3 s (Gemini: 6.5 s) and at most 300 times a day (set in the window: "Daily limit", 10–5000; after that it pauses until midnight).
+   service – at most every 2 s (Gemini: 6.5 s) and at most 300 times a day (set in the window: "Daily limit", 10–5000; after that it pauses until midnight).
 4. The service reads every message, joins wrapped lines, detects the language and translates it into your target
    language, returning name, original, language and translation.
 5. Messages already shown are recognised and not shown again; a better reading of a message replaces the old one.
@@ -37,6 +37,9 @@ side. Unofficial fan tool, not affiliated with Behaviour Interactive.
 - API keys are stored encrypted with Windows DPAPI, never in plain text and never in the log.
 
 ## Services
+
+Fastest are **Claude Haiku 5.5** and **Gemini Flash-Lite**; Claude Opus 5.5 reads difficult scripts most
+reliably but takes longer.
 
 | Service | What you need | Cost | Data |
 |---|---|---|---|

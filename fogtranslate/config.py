@@ -25,8 +25,8 @@ DEFAULTS = {
     "claude_key": "",                # "dpapi:…" only
     "gemini_key": "",                # "dpapi:…" only
     "accepted": [],                  # cloud services whose notice the user confirmed
-    "look_s": 1.0,                   # seconds between looks at the region
-    "min_gap_s": 3.0,                # at least this long between two requests
+    "look_s": 0.5,                   # seconds between looks at the region (a look costs ~16 ms)
+    "min_gap_s": 2.0,                # at least this long between two requests
     "daily_cap": 300,                # requests per day at most
     "show_s": 25.0,                  # how long new translations stay on screen
     "show_all": False,               # also show lines already in the target language
@@ -90,6 +90,11 @@ class Settings:
             if not services.valid_model(service, self.values[key]):
                 self.values[key] = services.DEFAULT_MODEL[service]
         self.values["accepted"] = [x for x in self.values["accepted"] if x in services.SERVICES]
+        # 0.8.2: faster defaults – values still at the old defaults (saved by earlier versions) move along
+        if float(self.values["look_s"]) == 1.0:
+            self.values["look_s"] = DEFAULTS["look_s"]
+        if float(self.values["min_gap_s"]) == 3.0:
+            self.values["min_gap_s"] = DEFAULTS["min_gap_s"]
         if not 10 <= int(self.values["daily_cap"]) <= 5000:
             self.values["daily_cap"] = DEFAULTS["daily_cap"]
         if not 1 <= int(self.values["ollama_port"]) <= 65535:

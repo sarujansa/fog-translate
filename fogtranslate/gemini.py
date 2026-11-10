@@ -14,7 +14,7 @@ NAME = "gemini"
 HOST = "https://generativelanguage.googleapis.com"
 MODELS = {
     "gemini-flash-latest": "Gemini Flash (recommended)",
-    "gemini-flash-lite-latest": "Gemini Flash-Lite (faster, weaker)",
+    "gemini-flash-lite-latest": "Gemini Flash-Lite (fastest, weaker)",
     "gemini-pro-latest": "Gemini Pro (best quality, small free quota)",
 }
 DEFAULT_MODEL = "gemini-flash-latest"

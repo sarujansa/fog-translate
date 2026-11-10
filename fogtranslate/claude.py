@@ -8,8 +8,8 @@ from .translate import MAX_TOKENS_DEFAULT, SCHEMA, SYSTEM, Result, TranslateErro
 NAME = "claude"
 MODELS = {                       # id → (label, $ per 1M input, $ per 1M output)
     "claude-opus-5-5": ("Claude Opus 5.5 (best quality)", 4.00, 20.00),
-    "claude-sonnet-5-5": ("Claude Sonnet 5.5", 2.00, 10.00),
-    "claude-haiku-5-5": ("Claude Haiku 5.5 (cheapest)", 0.10, 0.50),
+    "claude-sonnet-5-5": ("Claude Sonnet 5.5 (faster)", 2.00, 10.00),
+    "claude-haiku-5-5": ("Claude Haiku 5.5 (fastest, cheapest)", 0.10, 0.50),
 }
 DEFAULT_MODEL = "claude-opus-5-5"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"

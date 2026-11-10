@@ -103,6 +103,7 @@ class ChangeGate:
         self._last = None        # text of the previous look
         self._same = 0           # looks in a row with the same text
         self._sent = None        # text last handed out for a request
+        self.crop_top = 0        # with the last True: first row worth sending (only the new lines)
         self._waiting = 0        # looks in a row whose text differed from the text sent
         self.stats = {}          # for the log: text px, change to last look / to sent
 
@@ -128,6 +129,45 @@ class ChangeGate:
             return False
         if self._same + 1 < self.settle and self._waiting < self.max_wait:
             return False
+        self.crop_top = new_rows(self._sent, m)
         self._sent = m
         self._waiting = 0
         return True
+
+
+# ---------------------------------------------------------------- only the new lines
+MIN_KEPT = 0.3           # the earlier text must still be there for at least this share to trust an alignment
+MAX_LOST = 0.06          # … and at most this share of it may be unexplained
+MARGIN = 0.06            # rows above the first new text that are sent along (part of a line for context)
+
+
+def new_rows(before: np.ndarray | None, now: np.ndarray) -> int:
+    """First row of ``now`` (a text mask) that shows text ``before`` did not have – after finding how far the
+    chat scrolled up (DBD pushes old lines up when a new one comes). 0 = send the whole area (first look, no
+    trustworthy alignment, or everything is new)."""
+    if before is None or before.shape != now.shape:
+        return 0
+    h = now.shape[0]
+    total = int(np.count_nonzero(before))
+    if total < MIN_TEXT_PX:
+        return 0
+    grown_now = _grow(now)
+    best, best_share = None, 1.0
+    for s in range(0, h):
+        kept = before[s:]
+        n = int(np.count_nonzero(kept))
+        if n < MIN_KEPT * total:
+            break
+        share = np.count_nonzero(kept & ~grown_now[:h - s]) / n
+        if share < best_share:
+            best, best_share = s, share          # the scroll that explains the earlier text best
+    if best is None or best_share > MAX_LOST:
+        return 0
+    moved = np.zeros_like(before)
+    moved[:h - best] = before[best:]
+    fresh = now & ~_grow(moved)
+    rows = np.nonzero(fresh.sum(axis=1) >= 2)[0]
+    if len(rows) == 0:
+        return 0
+    start = int(rows[0]) - int(MARGIN * h)
+    return max(0, start)
