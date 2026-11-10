@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import logging
 import threading
+import time
 from dataclasses import dataclass
 
 from .lines import ChatLine
@@ -78,6 +79,7 @@ class TranslateError(Exception):
 class Result:
     lines: list[ChatLine]
     cost_usd: float
+    seconds: float = 0.0             # how long the service took (set by the caller that timed it)
 
 
 def png_bytes(img) -> bytes:
@@ -94,6 +96,22 @@ def png_bytes(img) -> bytes:
     buf = io.BytesIO()
     pic.save(buf, "PNG", compress_level=1)
     return buf.getvalue()
+
+
+def sample_picture():
+    """A small made-up chat (no real player) for "Test service": dark panel, light text, two languages."""
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFont
+    pic = Image.new("RGB", (520, 110), (14, 14, 16))
+    d = ImageDraw.Draw(pic)
+    try:
+        font = ImageFont.load_default(size=22)
+    except TypeError:                                # old Pillow
+        font = ImageFont.load_default()
+    d.text((14, 14), "Meg: hola, buena partida", fill=(235, 235, 235), font=font)
+    d.text((14, 48), "Ace: merci pour le heal", fill=(235, 235, 235), font=font)
+    d.text((14, 82), "Bill: gg", fill=(235, 235, 235), font=font)
+    return np.asarray(pic)[..., ::-1].copy()
 
 
 def _clip(v) -> str:
@@ -151,7 +169,10 @@ class Worker:
 
         def run():
             try:
-                self._done(self.translator.request(img))
+                t0 = time.monotonic()
+                result = self.translator.request(img)
+                result.seconds = time.monotonic() - t0
+                self._done(result)
             except TranslateError as e:
                 self._done(e)
             except Exception as e:                   # never let the thread die silently

@@ -51,7 +51,8 @@ def test_each_service_reaches_only_its_own_host():
 
 def test_the_key_never_goes_to_the_log():
     for name, text in _sources():
-        assert not re.search(r"log\w*\.\w+\(.*(api_key|key\b)", text), name
+        # an API key: "api_key", "…_key" or the word "key" – not "hotkey" (a key combination, no secret)
+        assert not re.search(r"log\w*\.\w+\(.*(api_key|_key\b|\bkey\b)", text.replace("hide_hotkey", "")), name
 
 
 def test_every_package_is_listed_in_third_party():

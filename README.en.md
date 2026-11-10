@@ -70,6 +70,15 @@ settings and keys stay.
 Test without the game: `.venv\Scripts\python -m fogtranslate --test chat.png [--service gemini]` translates one
 picture once. Keys can also come from `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
 
+## Using it
+
+- **Test service** checks key, model and service with a made-up sample chat and shows the answer time.
+- **Overlay:** text size and display time are set in the window. **Ctrl+Alt+T** hides and shows the translations
+  (also from the tray icon).
+- **Tray icon:** show window, start/stop, hide/show translations, quit. With "Keep running in the tray when I close
+  the window" the program keeps translating after you close the window.
+- The bottom line shows how long the last answer took.
+
 ## Updates
 
 **Check for updates** (bottom right) – the program asks GitHub only when you click it.

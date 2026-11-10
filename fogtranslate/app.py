@@ -100,6 +100,7 @@ class MainWindow(QWidget):
         root.addWidget(self.status)
 
         row = QHBoxLayout()
+        self.test_btn = QPushButton("Test service", clicked=self.test_service)
         self.pick_btn = QPushButton("Mark chat area", clicked=self.pick_region)
         self.shot_btn = QPushButton("Show last capture", clicked=self.show_last_picture)
         self.run_btn = QPushButton("Start", clicked=self.toggle)
@@ -140,6 +141,7 @@ class MainWindow(QWidget):
         key_row.addWidget(self.key)
         self.key_btn = QPushButton("Save", clicked=self._save_key)
         key_row.addWidget(self.key_btn)
+        key_row.addWidget(self.test_btn)
         grid.addLayout(key_row, 3, 1)
         self.key_link = QLabel()
         self.key_link.setOpenExternalLinks(True)
@@ -156,6 +158,25 @@ class MainWindow(QWidget):
         limit_row.addWidget(self.daily_cap)
         limit_row.addStretch(1)
         grid.addLayout(limit_row, 5, 1)
+        grid.addWidget(QLabel("Overlay:"), 6, 0)
+        look_row = QHBoxLayout()
+        self.font_px = NoWheelSpinBox()
+        self.font_px.setRange(10, 48)
+        self.font_px.setPrefix("text size ")
+        self.font_px.setSuffix(" px")
+        self.font_px.setValue(int(s["font_px"]))
+        self.font_px.valueChanged.connect(self._look_changed)
+        self.show_s = NoWheelSpinBox()
+        self.show_s.setRange(3, 600)
+        self.show_s.setSingleStep(5)
+        self.show_s.setPrefix("show for ")
+        self.show_s.setSuffix(" s")
+        self.show_s.setValue(int(float(s["show_s"])))
+        self.show_s.valueChanged.connect(self._look_changed)
+        look_row.addWidget(self.font_px)
+        look_row.addWidget(self.show_s)
+        look_row.addStretch(1)
+        grid.addLayout(look_row, 6, 1)
         root.addLayout(grid)
 
         self.show_all = QCheckBox("Also show messages already in my language")
@@ -170,6 +191,10 @@ class MainWindow(QWidget):
         self.hide_caps.setChecked(bool(s["hide_in_captures"]))
         self.hide_caps.toggled.connect(self._settings_changed)
         root.addWidget(self.hide_caps)
+        self.to_tray = QCheckBox("Keep running in the tray when I close the window")
+        self.to_tray.setChecked(bool(s["close_to_tray"]))
+        self.to_tray.toggled.connect(self._settings_changed)
+        root.addWidget(self.to_tray)
         self.notice = QLabel()
         self.notice.setWordWrap(True)
         root.addWidget(self.notice)
@@ -188,8 +213,110 @@ class MainWindow(QWidget):
         bottom.addWidget(self.update_btn)
         root.addLayout(bottom)
         self._update = None          # last update.Check
+        self.overlay_hidden = False  # hotkey / tray: translations hidden until toggled again
+        self.tray = None
+        self.hotkey = None
+        self._quitting = False
         self.resize(560, 560)
         self._service_ui()
+
+    def _look_changed(self, _value=None):
+        self.settings["font_px"] = int(self.font_px.value())
+        self.settings["show_s"] = float(self.show_s.value())
+        self.settings.save()
+        self.overlay.set_font_px(self.settings["font_px"])
+        if self.running:
+            self._refresh_overlay()
+
+    # ---------------------------------------------------------------- test, tray, hotkey
+    def test_service(self):
+        """One request with a made-up chat picture: shows whether key, model and service work, and how fast."""
+        service = self.settings["service"]
+        if not self.settings.accepted(service):
+            self.status.setText("Please confirm the notice below first.")
+            return
+        self.test_btn.setEnabled(False)
+        self.status.setText("Testing %s …" % services.SERVICES[service][0])
+        settings, put = self.settings, self.results.put
+
+        def work():
+            import time
+            t0 = time.monotonic()
+            try:
+                result = services.make(settings).request(translate.sample_picture())
+                result.seconds = time.monotonic() - t0
+                put(("test", result))
+            except translate.TranslateError as e:
+                put(("test", e))
+            except Exception as e:
+                log.exception("Test failed")
+                put(("test", translate.TranslateError("other", type(e).__name__)))
+
+        import threading
+        threading.Thread(target=work, name="test", daemon=True).start()
+
+    def _tested(self, outcome):
+        self.test_btn.setEnabled(True)
+        if isinstance(outcome, translate.TranslateError):
+            self._test_text = "Test failed: " + ERRORS.get(outcome.kind, outcome.kind)
+        else:
+            now = datetime.now()
+            self.settings.count_request(now.strftime("%Y-%m-%d"), now.strftime("%Y-%m"), outcome.cost_usd)
+            self.settings.save()
+            self._test_text = ("Test OK – %d of 3 messages read in %.1f s."
+                               % (min(3, len(outcome.lines)), outcome.seconds))
+        log.info("Test: %s", self._test_text)
+        self._test_until = datetime.now().timestamp() + 15
+
+    def toggle_overlay(self):
+        self.overlay_hidden = not self.overlay_hidden
+        self._refresh_overlay()
+        self._tray_texts()
+
+    def setup_tray(self, app):
+        from PySide6.QtGui import QAction
+        from PySide6.QtWidgets import QMenu, QSystemTrayIcon
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return False
+        from . import icon
+        self.tray = QSystemTrayIcon(icon.icon(), self)
+        self.tray.setToolTip("Fog Translate")
+        menu = QMenu()
+        self._act_window = QAction("Show window", menu, triggered=self.show_window)
+        self._act_run = QAction("Start", menu, triggered=self.toggle)
+        self._act_overlay = QAction("Hide translations", menu, triggered=self.toggle_overlay)
+        self._act_quit = QAction("Quit", menu, triggered=self.quit)
+        for a in (self._act_window, self._act_run, self._act_overlay):
+            menu.addAction(a)
+        menu.addSeparator()
+        menu.addAction(self._act_quit)
+        self._tray_menu = menu
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(lambda reason: self.show_window()
+                                    if reason == QSystemTrayIcon.ActivationReason.Trigger else None)
+        self.tray.show()
+        self._tray_texts()
+        return True
+
+    def _tray_texts(self):
+        if self.tray is None:
+            return
+        self._act_run.setText("Stop" if self.running else "Start")
+        self._act_overlay.setText("Show translations" if self.overlay_hidden else "Hide translations")
+
+    def show_window(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def quit(self):
+        self._quitting = True
+        self.close()
+
+    def setup_hotkey(self, app):
+        from .hotkey import Hotkey
+        self.hotkey = Hotkey(self.settings["hide_hotkey"], self.toggle_overlay)
+        return self.hotkey.start(app)
 
     def _cap_changed(self, value: int):
         self.settings["daily_cap"] = int(value)
@@ -262,6 +389,7 @@ class MainWindow(QWidget):
             self._render_history()
         s["read_background"] = self.background.isChecked()
         s["hide_in_captures"] = self.hide_caps.isChecked()
+        s["close_to_tray"] = self.to_tray.isChecked()
         self.overlay.hide_in_captures = s["hide_in_captures"]
         if services.is_cloud(service):
             s.set_accepted(service, self.accept.isChecked())
@@ -468,6 +596,8 @@ class MainWindow(QWidget):
                 break
             if kind == "update":
                 self._update_checked(value)
+            elif kind == "test":
+                self._tested(value)
             elif kind == "tick":
                 self.game = value
             elif kind == "started":
@@ -481,8 +611,8 @@ class MainWindow(QWidget):
                 if self.engine.answer(value):
                     self._render_history()
                 if self.engine.last_counts:
-                    log.info("Answer: %(read)d messages read, %(foreign)d foreign, %(new)d new, %(replaced)d replaced",
-                             self.engine.last_counts)
+                    log.info("Answer in %(seconds).2f s: %(read)d messages read, %(foreign)d foreign, %(new)d new, "
+                             "%(replaced)d replaced", self.engine.last_counts)
                 elif hasattr(value, "kind"):
                     log.info("Answer: error %s", value.kind)
                 self.settings.save()
@@ -492,7 +622,7 @@ class MainWindow(QWidget):
 
     def _refresh_overlay(self):
         box = self.engine.region_on_screen(self.game)
-        lines = self.engine.visible() if self.running and box is not None else []
+        lines = self.engine.visible() if self.running and box is not None and not self.overlay_hidden else []
         if not lines or self.picker is not None:
             self.overlay.hide()
             return
@@ -513,18 +643,31 @@ class MainWindow(QWidget):
             from .change import MIN_TEXT_PX
             if e.gate.stats.get("text_px", MIN_TEXT_PX) < MIN_TEXT_PX:
                 text = "Watching the chat … no text found in the marked area (mark it again?)"
+        now = datetime.now()
+        if getattr(self, "_test_until", 0) > now.timestamp():
+            text = self._test_text                       # the test's result stays readable for a moment
         self.status.setText(text)
         self.run_btn.setText("Stop" if self.running else "Start")
-        now = datetime.now()
+        self._tray_texts()
         spent = float(self.settings["spent"].get(now.strftime("%Y-%m"), 0.0))
-        self.costs.setText("Today %d / %d requests · this month about $%.2f (estimated)"
+        last = " · last answer %.1f s" % e.last_seconds if e.last_seconds > 0 else ""
+        self.costs.setText("Today %d / %d requests · this month about $%.2f (estimated)%s"
                            % (self.settings.requests_today(now.strftime("%Y-%m-%d")), int(self.settings["daily_cap"]),
-                              spent))
+                              spent, last))
 
     def closeEvent(self, event):
+        if self.settings["close_to_tray"] and self.tray is not None and not self._quitting:
+            event.ignore()                               # keep translating; the tray icon brings it back
+            self.hide()
+            return
         self._stop_looper(wait=2.0)
         self.overlay.close()
+        if self.hotkey is not None:
+            self.hotkey.stop(QApplication.instance())
+        if self.tray is not None:
+            self.tray.hide()
         super().closeEvent(event)
+        QApplication.instance().quit()
 
 
 def history_html(lines) -> str:
@@ -553,7 +696,10 @@ def run(argv=None) -> int:
     app = QApplication.instance() or QApplication(argv or sys.argv)
     app.setWindowIcon(icon.icon())
     settings = Settings()
+    app.setQuitOnLastWindowClosed(False)                 # the window may hide to the tray; closeEvent quits
     win = MainWindow(settings)
-    win.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+    win.setup_tray(app)
+    if win.setup_hotkey(app):
+        log.info("Hotkey %s hides/shows the translations", settings["hide_hotkey"])
     win.show()
     return app.exec()
