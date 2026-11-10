@@ -10,8 +10,8 @@
 AppId={{6B0C3E2A-5D0B-4C61-9E9A-2F7A6B1D4E77}
 AppName=Fog Translate
 AppVersion={#AppVersion}
-AppPublisher=sarujansa
-AppPublisherURL=https://github.com/sarujansa/fog-translate
+AppPublisher=senisinx
+AppPublisherURL=https://github.com/senisinx/fog-translate
 DefaultDirName={localappdata}\Programs\Fog Translate
 DefaultGroupName=Fog Translate
 DisableProgramGroupPage=yes

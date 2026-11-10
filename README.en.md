@@ -8,7 +8,7 @@ Live translation of the **Dead by Daylight** chat. You mark the chat area once; 
 an AI model reads them (any script: Cyrillic, Korean, Japanese, Chinese, Latin with accents …), detects the
 language and translates them. The translation appears in a small click-through window right above the chat.
 
-A standalone program, independent of [Fog Scout](https://github.com/sarujansa/fog-scout) – both can run side by
+A standalone program, independent of [Fog Scout](https://github.com/senisinx/fog-scout) – both can run side by
 side. Unofficial fan tool, not affiliated with Behaviour Interactive.
 
 ## How it works
@@ -55,7 +55,7 @@ the list with your installed models.
 ## Installing
 
 **Easy:** download `FogTranslate-Setup-<version>.exe` from
-[Releases](https://github.com/sarujansa/fog-translate/releases/latest) and run it – no admin rights, no Python
+[Releases](https://github.com/senisinx/fog-translate/releases/latest) and run it – no admin rights, no Python
 needed. The setup is not signed: Windows SmartScreen asks on the first start (More info → Run anyway). Updates:
 **Check for updates** shows a new version and opens the release page; the new setup installs over the old one,
 settings and keys stay.
