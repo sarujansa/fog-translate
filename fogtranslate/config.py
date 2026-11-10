@@ -32,6 +32,8 @@ DEFAULTS = {
     "show_all": False,               # also show lines already in the target language
     "hide_in_captures": False,       # True: the overlay is left out of screenshots/recordings (Windows)
     "read_background": True,         # also read with DBD behind another window – only if nothing covers the chat
+    "auto_start": True,              # start watching when the program opens (area marked, notice confirmed, key there)
+    "hide_without_chat": True,       # translations are on screen only while the marked area shows the chat
     "font_px": 18,
     "close_to_tray": False,          # closing the window keeps the program running in the tray
     "setup_done": False,             # the setup assistant was finished or skipped

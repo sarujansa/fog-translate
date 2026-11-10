@@ -16,7 +16,8 @@ nebeneinander.
 
 1. **Mark chat area** macht ein Standbild des DBD-Fensters; du ziehst einen Rahmen um den Chat und klickst **Save**.
    Der Bereich wird relativ zum Spielfenster gespeichert und passt auch bei anderer Fenstergröße.
-2. Nach **Start** schaut das Programm zweimal pro Sekunde auf diesen Bereich (nur Bildschirmpixel).
+2. Nach **Start** schaut das Programm zweimal pro Sekunde auf diesen Bereich (nur Bildschirmpixel). Ist der Bereich
+   markiert und der Dienst eingerichtet, startet es beim Öffnen von selbst („Start automatically …“, abschaltbar).
 3. Verglichen wird nur die **Schrift** im Bereich (helle, scharfe Striche auf dem dunklen Chat-Feld) – die bewegte
    Lobby dahinter zählt nicht. Hat sich die Schrift geändert, geht das Bild des Bereichs an den gewählten Dienst –
    höchstens alle 2 s (Gemini: 6,5 s), höchstens 300-mal am Tag (einstellbar: „Daily limit“). Geschickt wird nur der
@@ -78,7 +79,7 @@ alte Fassung, Einstellungen und Keys bleiben.
    jederzeit über „Setup assistant“. Der Key wird nie im Installer abgefragt, sondern im Programm und dort sofort
    verschlüsselt gespeichert.
 4. DBD öffnen (Lobby mit sichtbarem Chat), **Mark chat area**: das Programm zeigt ein Standbild des Spiels – Rahmen um
-   den ganzen Chat ziehen (etwas breiter als die längste Zeile), **Save**. Dann **Start**.
+   den ganzen Chat ziehen (etwas breiter als die längste Zeile), **Save** – danach startet es von selbst (sonst **Start**).
 
 Test ohne Spiel: `.venv\Scripts\python -m fogtranslate --test chat.png [--service gemini]` übersetzt einen
 Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_API_KEY`.
@@ -90,6 +91,9 @@ Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_AP
 - **Test service** prüft Key, Modell und Dienst mit einem erfundenen Beispiel-Chat und zeigt die Antwortzeit.
 - **Overlay:** Schriftgröße und Anzeigedauer im Fenster. **Strg+Alt+T** blendet die Übersetzungen aus und wieder ein
   (auch über das Symbol im Infobereich).
+- **Nur mit Chat:** Die Übersetzungen stehen nur da, solange im markierten Bereich der Chat zu sehen ist. Verschwindet
+  er (Match, Menü ohne Chat, anderes Fenster darüber, DBD minimiert), sind sie nach etwa einer Sekunde weg und
+  kommen mit dem Chat wieder. Abschaltbar: „Show translations only while the chat is visible“.
 - **Infobereich (Tray):** Fenster zeigen, Start/Stop, Übersetzungen aus/ein, Beenden. Mit „Keep running in the tray
   when I close the window“ läuft das Programm weiter, wenn du das Fenster schließt.
 - Unten steht, wie lange die letzte Antwort gebraucht hat.

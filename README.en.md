@@ -15,7 +15,8 @@ side. Unofficial fan tool, not affiliated with Behaviour Interactive.
 
 1. **Mark chat area** takes a still picture of the DBD window; you drag a box around the chat and click **Save**.
    The area is stored relative to the game window, so it survives another window size.
-2. After **Start**, the program looks at that area twice a second (screen pixels only).
+2. After **Start**, the program looks at that area twice a second (screen pixels only). Once the area is marked and
+   the service is set up, it starts by itself when it opens ("Start automatically …", can be switched off).
 3. It compares only the **text** in the area (bright, sharp strokes on the dark chat panel), so the moving lobby
    behind the chat does not count. When the text has changed, the picture of the area is sent to the chosen
    service – at most every 2 s (Gemini: 6.5 s) and at most 300 times a day (set in the window: "Daily limit", 10–5000; after that it pauses until midnight).
@@ -70,7 +71,7 @@ settings and keys stay.
    any time via "Setup assistant". The key is never asked for by the installer, only in the program, where it is
    stored encrypted at once.
 4. Open DBD (lobby with the chat visible), **Mark chat area**: drag a box around the whole chat (a little wider
-   than the longest line), **Save**. Then **Start**.
+   than the longest line), **Save** – it then starts by itself (otherwise **Start**).
 
 Test without the game: `.venv\Scripts\python -m fogtranslate --test chat.png [--service gemini]` translates one
 picture once. Keys can also come from `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
@@ -82,6 +83,9 @@ picture once. Keys can also come from `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
 - **Test service** checks key, model and service with a made-up sample chat and shows the answer time.
 - **Overlay:** text size and display time are set in the window. **Ctrl+Alt+T** hides and shows the translations
   (also from the tray icon).
+- **Only with the chat:** translations are on screen only while the marked area shows the chat. When it goes away
+  (match, a menu without chat, another window over it, DBD minimised) they are gone after about a second and come
+  back with the chat. Can be switched off: "Show translations only while the chat is visible".
 - **Tray icon:** show window, start/stop, hide/show translations, quit. With "Keep running in the tray when I close
   the window" the program keeps translating after you close the window.
 - The bottom line shows how long the last answer took.
