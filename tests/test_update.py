@@ -1,4 +1,7 @@
 import hashlib
+import shutil
+
+import pytest
 
 from fogtranslate import deps, update
 
@@ -33,6 +36,37 @@ def test_nothing_is_fetched_before_branch_and_changes_are_checked():
     g = FakeGit(dirty=" M x")
     update.check(git=g)
     assert ("fetch", "--quiet", "origin", "main") not in g.calls
+
+
+def test_a_clone_from_the_old_account_is_moved_to_the_new_address(tmp_path):
+    """0.9.4: an origin under the old GitHub name is set to REPO_URL before the fetch – real git, temp folder."""
+    if shutil.which("git") is None:
+        pytest.skip("git not installed")
+    repo = str(tmp_path)
+    git = lambda *a: update._git(repo, *a)                                   # noqa: E731
+    git("init", "-q")
+    for old in ("https://github.com/{}/fog-translate.git", "https://github.com/{}/Fog-Translate",
+                "git@github.com:{}/fog-translate.git"):
+        git("remote", "add", "origin", old.format(update.OLD_OWNER))
+        assert update.move_origin(git) is True
+        assert git("config", "--get", "remote.origin.url") == update.REPO_URL + ".git"
+        git("remote", "remove", "origin")
+    for other in ("https://github.com/someone/fog-translate.git", "https://example.com/{}/fog-translate.git",
+                  "https://github.com/{}/fog-translate.git.evil"):
+        git("remote", "add", "origin", other.format(update.OLD_OWNER))
+        assert update.move_origin(git) is False
+        assert git("config", "--get", "remote.origin.url") == other.format(update.OLD_OWNER)
+        git("remote", "remove", "origin")
+    assert update.move_origin(git) is False                                  # no origin at all
+
+
+def test_the_check_moves_the_origin_before_it_fetches():
+    g = FakeGit()
+    g.answers["config"] = "https://github.com/%s/fog-translate.git" % update.OLD_OWNER
+    update.check(git=g)
+    names = [c[0] for c in g.calls]
+    assert names.index("remote") < names.index("fetch")
+    assert ("remote", "set-url", "origin", update.REPO_URL + ".git") in g.calls
 
 
 def test_applying_is_fast_forward_only():
