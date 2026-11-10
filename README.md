@@ -40,7 +40,8 @@ nebeneinander.
   Chat.
 - Das Übersetzungsfenster ist in Screenshots und Aufnahmen sichtbar; wer das nicht will, setzt das Häkchen
   „Hide the translation in screenshots and recordings“. Das Programm liest seine eigene Übersetzung nie mit.
-- Die Oberfläche ist Englisch.
+- Die Oberfläche gibt es auf Englisch, Italienisch, Russisch, Chinesisch (vereinfacht), Japanisch und Koreanisch
+  („Language“, Standard: wie Windows, sonst Englisch) und in Hell oder Dunkel („Appearance“).
 - **Internet:** nur zum gewählten Dienst (siehe unten). Gesendet wird das Bild des markierten Bereichs – **es kann
   Spielernamen und Nachrichten anderer Spieler zeigen** – und die Zielsprache. Nur wenn sich dort etwas geändert
   hat, höchstens alle 2 s (Gemini: 6,5 s), höchstens 300 Anfragen am Tag (einstellbar im Fenster: „Daily limit“, 10–5000; danach Pause bis Mitternacht).
@@ -69,8 +70,10 @@ füllt die Liste mit den installierten Modellen.
 **Einfach:** Unter [Releases](https://github.com/senisinx/fog-translate/releases/latest) die Datei
 `FogTranslate-Setup-<Version>.exe` laden und starten – keine Admin-Rechte, kein Python nötig. Das Setup ist nicht
 signiert: Windows SmartScreen fragt beim ersten Start (Weitere Informationen → Trotzdem ausführen). Updates:
-**Check for updates** zeigt eine neue Version und öffnet die Release-Seite; das neue Setup installiert über die
-alte Fassung, Einstellungen und Keys bleiben.
+**Check for updates** zeigt eine neue Version, **Download update** lädt das Setup und prüft seine SHA-256,
+**Install and restart** installiert es und startet neu – Einstellungen und Keys bleiben. Das Setup selbst gibt es
+auch auf Italienisch, Russisch, Chinesisch, Japanisch und Koreanisch – samt Nutzungsbedingungen in der gewählten
+Sprache (Übersetzungen zur Orientierung; maßgeblich ist der englische Text in `LICENSE`).
 
 **Aus dem Quelltext:**
 
@@ -108,6 +111,12 @@ Knopf **Check for updates** unten rechts – das Programm fragt GitHub nur auf d
   Ordner nichts geändert wurde) und startet neu. `start.bat` installiert geänderte Pakete dabei automatisch. Ein Klon
   unter dem alten GitHub-Kontonamen wird dabei auf `github.com/senisinx/fog-translate` umgestellt.
 - Als ZIP installiert: zeigt die neue Versionsnummer und öffnet die Download-Seite.
+- Mit dem Setup installiert (.exe): drei Klicks auf denselben Knopf, nichts passiert von selbst. **Check for
+  updates** fragt nur das neueste Release dieses Repositorys ab. **Download update** lädt das Setup von dort
+  (nur `github.com/senisinx/fog-translate/releases/download/…`) nach `%LOCALAPPDATA%\FogTranslate\update` und
+  behält es nur, wenn die SHA-256 zur Prüfsumme des Releases passt. **Install and restart** prüft die Datei noch
+  einmal, startet das Setup und beendet das Programm; das Setup wartet darauf, installiert ohne Fragen und startet
+  die neue Version. Bricht es ab, startet die alte wieder.
 
 ## Wenn etwas nicht stimmt
 

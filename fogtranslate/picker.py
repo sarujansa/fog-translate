@@ -15,6 +15,7 @@ from PySide6.QtGui import QColor, QImage, QPainter, QPen
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from . import geometry
+from .i18n import tr
 
 AMBER = QColor(255, 196, 92)
 
@@ -91,19 +92,19 @@ class RegionPicker(QWidget):
 
     def __init__(self, picture, done, current=None):
         super().__init__(None, Qt.WindowType.Window)
-        self.setWindowTitle("Mark chat area")
+        self.setWindowTitle(tr("Mark chat area"))
         h, w = np.asarray(picture).shape[:2]
         self.view = geometry.window_space(w, h)
         self._done = done
         self._finished = False
         box = geometry.from_relative(current, self.view) if current else None
         self.canvas = Canvas(picture, box, self._update_buttons)
-        hint = QLabel("Drag a box around the whole chat – a little wider than the longest line, including the "
-                      "scroll bar. Then click Save.")
+        hint = QLabel(tr("Drag a box around the whole chat – a little wider than the longest line, including the "
+                         "scroll bar. Then click Save."))
         hint.setWordWrap(True)
-        self.save_btn = QPushButton("Save", clicked=self.save)
+        self.save_btn = QPushButton(tr("Save"), clicked=self.save)
         self.save_btn.setDefault(True)
-        cancel = QPushButton("Cancel", clicked=self.cancel)
+        cancel = QPushButton(tr("Cancel"), clicked=self.cancel)
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         buttons.addWidget(cancel)

@@ -13,6 +13,7 @@ from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PySide6.QtWidgets import QWidget
 
 from . import qtgeom
+from .i18n import tr
 from .lines import ChatLine
 
 PAD = 10
@@ -61,7 +62,7 @@ class TranslationOverlay(QWidget):
     def rows(self, line: ChatLine):
         """[(parts, font)] – parts = [(text, colour)]: header (tag + name), translation, original (small)."""
         tag = [(line.language.upper() + "  ", LANG)] if line.translate else []
-        out = [(tag + [(line.sender or "System", SENDER)], self.font_small)]
+        out = [(tag + [(line.sender or tr("System"), SENDER)], self.font_small)]
         out.append(([(line.translation if line.translate else line.text, TEXT)], self.font_main))
         if self.show_original and line.translate and line.translation != line.text:
             out.append(([(line.text, ORIGINAL)], self.font_small))

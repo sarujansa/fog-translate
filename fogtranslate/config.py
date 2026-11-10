@@ -7,7 +7,7 @@ import os
 import sys
 import tempfile
 
-from . import geometry, services, translate
+from . import geometry, i18n, services, theme, translate
 
 log = logging.getLogger(__name__)
 APP_DIR = "FogTranslate"
@@ -34,6 +34,8 @@ DEFAULTS = {
     "read_background": True,         # also read with DBD behind another window – only if nothing covers the chat
     "auto_start": True,              # start watching when the program opens (area marked, notice confirmed, key there)
     "hide_without_chat": True,       # translations are on screen only while the marked area shows the chat
+    "ui_language": "auto",           # the window's language: "auto" (Windows) or a code from i18n.LANGS
+    "theme": "auto",                 # auto (as Windows) | light | dark
     "font_px": 18,
     "close_to_tray": False,          # closing the window keeps the program running in the tray
     "setup_done": False,             # the setup assistant was finished or skipped
@@ -100,6 +102,10 @@ class Settings:
             self.values["look_s"] = DEFAULTS["look_s"]
         if float(self.values["min_gap_s"]) == 3.0:
             self.values["min_gap_s"] = DEFAULTS["min_gap_s"]
+        if self.values["ui_language"] != "auto" and self.values["ui_language"] not in i18n.LANGS:
+            self.values["ui_language"] = "auto"
+        if self.values["theme"] not in theme.THEMES:
+            self.values["theme"] = "auto"
         if not 10 <= int(self.values["font_px"]) <= 48:
             self.values["font_px"] = DEFAULTS["font_px"]
         if not 3 <= float(self.values["show_s"]) <= 600:

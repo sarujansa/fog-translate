@@ -1,0 +1,50 @@
+﻿Fog Translate – Condizioni d'uso
+Copyright (c) 2026 senisinx. Tutti i diritti riservati.
+
+1. Uso e condivisione. Puoi scaricare e usare Fog Translate gratuitamente. Puoi cedere
+   ad altri, gratuitamente, il programma non modificato, purché queste condizioni lo
+   accompagnino (il modo più semplice: condividere il link al repository GitHub).
+
+2. Modifiche solo con autorizzazione. Modificare, rielaborare, tradurre o sviluppare
+   ulteriormente il programma o il suo codice sorgente (in tutto o in parte), nonché
+   distribuire o pubblicare versioni modificate, è consentito solo previa autorizzazione
+   scritta dell'autore (ad es. chiedendola in una issue su GitHub). La vendita non è
+   consentita. Restano impregiudicate la visualizzazione e il fork su GitHub ai sensi
+   dei Termini di servizio di GitHub.
+
+3. Non ufficiale. Fog Translate è uno strumento non ufficiale creato da un fan. Non è
+   affiliato a Behaviour Interactive (Dead by Daylight), Epic Games (Easy Anti-Cheat),
+   Anthropic, Google, Ollama o ai loro partner, e non è stato da essi esaminato né
+   approvato. "Dead by Daylight" e i nomi correlati sono marchi dei rispettivi
+   titolari.
+
+4. A tuo rischio. Usi il programma a tuo rischio. Fog Translate legge soltanto i pixel
+   dello schermo e le informazioni sulle finestre, non modifica i file di gioco, non
+   accede al processo del gioco e non invia alcun input al gioco. Tuttavia nessuno può
+   garantire come Behaviour Interactive o un sistema anti-cheat valuti un programma
+   esterno. Non vi è alcuna garanzia che il suo utilizzo non comporti un avvertimento,
+   un ban o la perdita di un account di gioco. Se usarlo è una tua decisione; il
+   rispetto delle regole del gioco è una tua responsabilità.
+
+5. Servizi di traduzione e dati di altre persone. Con Claude (Anthropic) o Gemini
+   (Google), un'immagine dell'area della chat selezionata viene inviata al relativo
+   fornitore, con il tuo account e la tua chiave API. L'immagine può mostrare nomi e
+   messaggi di altri giocatori. Sei responsabile dell'uso di questi servizi, dei
+   relativi costi, del rispetto delle loro condizioni e della protezione dei dati nei
+   confronti degli altri giocatori. Con Ollama l'immagine resta sul tuo computer. Le
+   traduzioni possono essere errate.
+
+6. Nessuna garanzia. Il programma è fornito "così com'è", senza garanzie di alcun tipo,
+   comprese quelle di accuratezza, disponibilità o idoneità a uno scopo particolare.
+
+7. Responsabilità. Nei limiti consentiti dalla legge, l'autore non risponde di alcun
+   danno derivante dall'uso del programma o dall'impossibilità di usarlo, in particolare
+   non di ban o della perdita di account di gioco, dei costi dei servizi di traduzione,
+   di progressi o di dati. Resta impregiudicata la responsabilità per dolo e colpa grave
+   e per lesioni alla vita, all'integrità fisica o alla salute.
+
+8. Componenti di terzi. Le librerie utilizzate dal programma (vedi THIRD_PARTY.md) sono
+   soggette alle proprie licenze; le presenti condizioni non si applicano ad esse.
+
+Questo testo italiano è una traduzione fornita per comodità. In caso di divergenze tra
+questo testo e il testo inglese, prevale il testo inglese (file LICENSE del programma).

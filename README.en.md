@@ -61,8 +61,11 @@ the list with your installed models.
 **Easy:** download `FogTranslate-Setup-<version>.exe` from
 [Releases](https://github.com/senisinx/fog-translate/releases/latest) and run it – no admin rights, no Python
 needed. The setup is not signed: Windows SmartScreen asks on the first start (More info → Run anyway). Updates:
-**Check for updates** shows a new version and opens the release page; the new setup installs over the old one,
-settings and keys stay.
+**Check for updates** shows a new version, **Download update** fetches the setup and checks its SHA-256,
+**Install and restart** installs it and starts again – settings and keys stay. The window comes in English,
+Italian, Russian, Chinese (Simplified), Japanese and Korean ("Language", default: as Windows, else English) and in a
+light or dark look ("Appearance"); the setup itself speaks these languages too and shows the terms of use in
+the chosen language (translations for convenience; the English text in `LICENSE` is the one that applies).
 
 **From source:**
 
@@ -100,6 +103,12 @@ picture once. Keys can also come from `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
   nothing in the folder was changed) and restarts. `start.bat` installs changed packages automatically. A clone
   under the old GitHub account name is switched to `github.com/senisinx/fog-translate` on the way.
 - Installed from a ZIP: shows the new version number and opens the download page.
+- Installed with the setup (.exe): three clicks on the same button, nothing happens by itself. **Check for
+  updates** asks only for the latest release of this repository. **Download update** fetches the setup from there
+  (only `github.com/senisinx/fog-translate/releases/download/…`) into `%LOCALAPPDATA%\FogTranslate\update` and
+  keeps it only if its SHA-256 matches the release's checksum. **Install and restart** checks the file once more,
+  starts the setup and ends the program; the setup waits for that, installs without questions and starts the new
+  version. If it breaks off, the old one starts again.
 
 ## If something is wrong
 

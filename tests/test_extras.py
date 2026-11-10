@@ -199,3 +199,52 @@ def test_translations_are_shown_only_while_the_chat_is_seen(app):
     assert Settings()["auto_start"] is False
     win.running = False
     win.close()
+
+
+# ---------------------------------------------------------------- the installed .exe updates itself on click (0.10)
+def test_the_exe_update_takes_three_clicks_and_nothing_starts_by_itself(app, monkeypatch, tmp_path):
+    from fogtranslate import relupdate
+    win = MainWindow(Settings())
+    monkeypatch.setattr(win, "_self_updating", lambda: True)
+    rel = relupdate.Release("9.9", "v9.9", "FogTranslate-Setup-9.9.exe", "u", 10, "s")
+    calls = []
+    monkeypatch.setattr(relupdate, "check", lambda version: calls.append("check") or ("available", rel, "9.9"))
+    monkeypatch.setattr(relupdate, "download",
+                        lambda r, folder: calls.append("download") or setattr(r, "sha256", "a" * 64) or "setup.exe")
+    monkeypatch.setattr(relupdate, "start_setup", lambda path, sha, folder: calls.append(("start", path, sha)) or True)
+    assert win.update_btn.text() == "Check for updates"
+    win.update_clicked()
+    _wait(win, lambda: win._release is rel)
+    assert calls == ["check"]
+    assert win.update_btn.text() == "Download update" and "9.9" in win.status.text()
+    win.update_clicked()
+    _wait(win, lambda: win._setup_file is not None)
+    assert calls == ["check", "download"]
+    assert win.update_btn.text() == "Install and restart" and win.update_btn.isEnabled()
+    quit_called = []
+    monkeypatch.setattr(win, "quit", lambda: quit_called.append(1))
+    win.update_clicked()
+    assert calls[-1] == ("start", "setup.exe", "a" * 64) and quit_called == [1]
+    win.close()
+
+
+def test_a_failed_download_or_start_leaves_the_program_running(app, monkeypatch):
+    from fogtranslate import relupdate
+    win = MainWindow(Settings())
+    monkeypatch.setattr(win, "_self_updating", lambda: True)
+    win._release = relupdate.Release("9.9", "v9.9", "FogTranslate-Setup-9.9.exe", "u", 10, "s")
+
+    def broken(r, folder):
+        raise ValueError("checksum does not match")
+    monkeypatch.setattr(relupdate, "download", broken)
+    win.update_clicked()
+    _wait(win, lambda: not win._downloading)
+    assert win._setup_file is None
+    assert win.update_btn.text() == "Download update" and "nothing was installed" in win.status.text()
+    win._setup_file = ("setup.exe", "a" * 64)
+    monkeypatch.setattr(relupdate, "start_setup", lambda *a: False)
+    quit_called = []
+    monkeypatch.setattr(win, "quit", lambda: quit_called.append(1))
+    win.update_clicked()
+    assert quit_called == [] and win._setup_file is None and "failed" in win.status.text()
+    win.close()
