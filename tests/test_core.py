@@ -174,6 +174,9 @@ def test_a_refusal_and_a_broken_answer_become_errors():
 
 
 # ---------------------------------------------------------------- engine
+READ = ChatLine("Meg", "hi", "en", "hi", False)        # the fake service read a message (an answer without any
+                                                       # makes the engine wait, see the test at the end)
+
 class FakeWorker:
     def __init__(self):
         self.busy = False
@@ -232,7 +235,7 @@ def test_requests_keep_the_minimum_gap_and_the_daily_cap():
     eng.look(GAME, True, grab)
     eng.look(GAME, True, grab)
     assert len(eng.worker.sent) == 1
-    eng.answer(Result([], 0.01))
+    eng.answer(Result([READ], 0.01))
     t[0] = 1.0
     eng.look(GAME, True, grab)
     eng.look(GAME, True, grab)            # settled, but gap not over
@@ -561,7 +564,7 @@ def test_after_a_failed_request_the_chat_is_sent_again():
     one = base[1:] + ["Nea: kto kempit na hukah"]
     for frame in (base, base):
         eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
-    eng.answer(Result([], 0.0))
+    eng.answer(Result([READ], 0.0))
     for frame in (one, one):
         eng.look(GAME, True, lambda box, f=frame: _chat_lines(f))
     assert len(eng.worker.sent) == 2 and eng.worker.sent[-1].shape[0] < 80
@@ -719,3 +722,61 @@ def test_no_chat_is_seen_without_the_game_or_under_another_window():
 def test_without_the_setting_translations_stay_when_the_chat_is_gone():
     eng, _ = _engine(hide_without_chat=False)
     assert eng.chat_shown() and not eng.chat_seen
+
+
+# ---------------------------------------------------------------- the game behind a closed chat (0.9.8)
+def _scene(seed, shape=(400, 300)):
+    """Dark game picture with bright sharp speckles in tall blocks (a figure, grass) – no written lines."""
+    rng = np.random.default_rng(seed)
+    img = np.full(shape + (3,), 18, np.uint8)
+    for top, left, h, w in ((20, 20, 230, 120), (150, 160, 200, 110)):
+        dots = rng.random((h, w)) < 0.06
+        img[top:top + h, left:left + w][dots] = 210
+    return img
+
+
+def test_a_picture_of_the_game_is_not_chat():
+    from fogtranslate.change import MIN_TEXT_PX, chat_like, text_mask
+    from fogtranslate.translate import sample_picture
+    scene = text_mask(_scene(1))
+    assert int(scene.sum()) > 10 * MIN_TEXT_PX and not chat_like(scene)     # plenty of "text", but no lines
+    assert chat_like(text_mask(_chat_lines(CHAT))) and chat_like(text_mask(sample_picture()))
+    assert chat_like(text_mask(_chat_lines(CHAT[:1])))                      # one line is chat already
+    two = np.vstack([_chat_lines(CHAT, line_h=17), _chat_lines(CHAT, line_h=40)])
+    assert chat_like(text_mask(two))                                        # tight and wide line spacing
+
+
+def test_the_game_behind_a_closed_chat_is_never_sent_and_hides_the_translations():
+    eng, t = _engine(min_gap_s=0.0)
+    for n in range(12):                                # it keeps moving: every look differs
+        eng.look(GAME, True, lambda box, n=n: _scene(n))
+        t[0] += 0.5
+    assert eng.worker.sent == [] and not eng.chat_seen and eng._pending is None
+    for _ in range(2):
+        eng.look(GAME, True, lambda box: _chat_lines(CHAT, size=(300, 400)))
+    assert len(eng.worker.sent) == 1 and eng.chat_seen                      # the chat opens: read at once
+
+
+def test_answers_without_any_message_slow_the_requests_down():
+    from fogtranslate.engine import EMPTY_MAX_S, EMPTY_WAIT_S
+    eng, t = _engine(min_gap_s=0.0, daily_cap=5000)
+    for _ in range(2):
+        eng.look(GAME, True, lambda box: _chat(1))
+    assert len(eng.worker.sent) == 1
+    eng.answer(Result([], 0.0))                        # nothing read in what was sent
+    assert eng._not_before - t[0] == EMPTY_WAIT_S
+    for _ in range(4):
+        eng.look(GAME, True, lambda box: _chat(2))
+    assert len(eng.worker.sent) == 1                   # the next picture waits
+    t[0] += EMPTY_WAIT_S + 0.1
+    eng.look(GAME, True, lambda box: _chat(2))
+    assert len(eng.worker.sent) == 2
+    eng.answer(Result([], 0.0))
+    assert eng._not_before - t[0] == 2 * EMPTY_WAIT_S  # twice in a row: twice as long
+    for _ in range(10):
+        eng.answer(Result([], 0.0))
+    assert eng._not_before - t[0] == EMPTY_MAX_S       # never longer than this
+    t[0] += EMPTY_MAX_S + 0.1
+    eng.answer(Result([READ], 0.0))                    # a message was read: back to normal
+    eng.answer(Result([], 0.0))
+    assert eng._not_before - t[0] == EMPTY_WAIT_S

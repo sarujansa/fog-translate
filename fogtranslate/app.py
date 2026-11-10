@@ -701,7 +701,7 @@ class MainWindow(QWidget):
             text = ERRORS.get(e.error, e.error)
         elif self.running and e.status == "watching":
             from .change import MIN_TEXT_PX
-            if e.gate.stats.get("text_px", MIN_TEXT_PX) < MIN_TEXT_PX:
+            if e.gate.stats.get("text_px", MIN_TEXT_PX) < MIN_TEXT_PX or not e.gate.stats.get("chat", True):
                 text = STATUS["no_chat"]
         now = datetime.now()
         if getattr(self, "_test_until", 0) > now.timestamp():

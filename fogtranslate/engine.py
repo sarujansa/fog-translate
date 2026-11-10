@@ -22,6 +22,8 @@ SEAM = 6                         # dark rows between stacked pictures
 ERROR_WAIT_S = 10.0              # after any other failed request
 QUOTA_WAIT_S = 60.0              # after a "limit reached" answer, wait at least this long
 SERVICE_GAP_S = {"gemini": 6.5}  # Gemini's free tier allows about 10 requests a minute
+EMPTY_WAIT_S = 15.0              # after an answer without any message: wait, doubled each time in a row …
+EMPTY_MAX_S = 300.0              # … up to this (the area shows something that is not chat)
 GONE_LOOKS = 2                   # looks in a row without chat text before the chat counts as gone
 BILLED_ERRORS = ("answer", "refused")   # the service answered (and charged), but nothing usable came back
 
@@ -59,6 +61,7 @@ class Engine:
         self.last_sent = None        # the last picture sent (in memory only) – "Letzten Ausschnitt zeigen"
         self.chat_seen = False       # the marked area shows chat text right now (the overlay follows this)
         self._gone = 0               # looks in a row without chat text
+        self._empty = 0              # answers in a row that read no message at all
 
     @_locked
     def region_on_screen(self, game) -> tuple[int, int, int, int] | None:
@@ -103,7 +106,7 @@ class Engine:
             self.status = "watching"
         fired = self.gate.look(img)
         mask = self.gate.last_mask
-        if self.gate.stats.get("text_px", 0) >= MIN_TEXT_PX:
+        if self.gate.stats.get("chat"):
             self.chat_seen, self._gone = True, 0
         else:                                # one look without text can be a line scrolling or the chat fading in
             self._gone += 1
@@ -113,6 +116,11 @@ class Engine:
         # (simulated 10.11.2026: 6 messages/s with a 4 s answer lost 27 of 60 without this). ``_ref`` is the text
         # of the oldest picture not yet safe; "far" = the chat moved KEEP_AT of the area since then.
         far = self._moved_far(mask, img.shape[0])
+        if not self.gate.stats.get("chat"):
+            # no written lines in the area (chat closed, the game behind it): nothing is kept or sent – what
+            # already waits may still go out
+            self._try_send()
+            return
         if self._pending is not None:
             if far:
                 self._keep(img, mask)        # the unsent picture goes to the backlog, this one is the new one
@@ -247,6 +255,13 @@ class Engine:
         self.settings.count_request(n.strftime("%Y-%m-%d"), n.strftime("%Y-%m"), outcome.cost_usd)
         self.status = "watching"
         self.error = ""
+        if outcome.lines:
+            self._empty = 0
+        else:
+            # the service found no message in what was sent: whatever the area shows, asking again at once only
+            # costs – wait longer each time until an answer reads something
+            self._empty += 1
+            self._not_before = self.clock() + min(EMPTY_WAIT_S * 2 ** (self._empty - 1), EMPTY_MAX_S)
         added, replaced = self.transcript.add(outcome.lines)
         self.last_counts = {"read": len(outcome.lines), "foreign": sum(1 for ln in outcome.lines if ln.translate),
                             "new": len(added), "replaced": len(replaced),

@@ -96,6 +96,28 @@ def differs(a, b) -> bool:
     return n >= MIN_CHANGED_PX and n > CHANGED_SHARE * a.size
 
 
+MAX_LINE_ROWS = 80       # rows of text without a gap: a line of chat (two tight lines at most) is far lower
+SCENE_SHARE = 0.5        # more of the "text" than this in such tall blocks = a picture of the game, not chat
+GAP_SHARE = 0.05         # a row with fewer text pixels than this share of a busy row counts as a gap
+
+
+def chat_like(mask: np.ndarray) -> bool:
+    """Whether the text pixels are laid out like written lines: low bands with gaps between them. The game behind
+    a closed chat (lobby figure, grass, a chainsaw's teeth) also has bright sharp edges on dark, but they fill tall
+    blocks without line gaps (Saru, 10.11.2026: such pictures were sent again and again, the request count ran
+    up). Without this the area is never sent and counts as "no chat"."""
+    rows = mask.sum(axis=1)
+    total = int(rows.sum())
+    if total < MIN_TEXT_PX:
+        return False
+    floor = max(2.0, GAP_SHARE * float(np.percentile(rows[rows > 0], 90)))
+    on = (rows >= floor).astype(np.int8)
+    edges = np.diff(np.concatenate(([0], on, [0])))
+    starts, ends = np.nonzero(edges == 1)[0], np.nonzero(edges == -1)[0]
+    tall = sum(int(rows[a:b].sum()) for a, b in zip(starts, ends) if b - a > MAX_LINE_ROWS)
+    return tall <= SCENE_SHARE * total
+
+
 class ChangeGate:
     def __init__(self, settle: int = SETTLE_LOOKS, max_wait: int = MAX_WAIT_LOOKS):
         self.settle = settle
@@ -133,8 +155,12 @@ class ChangeGate:
         text = int(np.count_nonzero(m))
         new = differs(self._sent, m)
         self._waiting = self._waiting + 1 if new and text >= MIN_TEXT_PX else 0
+        chat = chat_like(m)
         self.stats = {"text_px": text, "to_last": to_last, "settled": self._same + 1 >= self.settle,
-                      "waiting": self._waiting}
+                      "waiting": self._waiting, "chat": chat}
+        if not chat:                         # the game behind a closed chat: never sent, nothing waits
+            self._waiting = 0
+            return False
         if text < MIN_TEXT_PX or not new:
             return False
         if self._same + 1 < self.settle and self._waiting < self.max_wait:

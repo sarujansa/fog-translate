@@ -21,7 +21,9 @@ nebeneinander.
 3. Verglichen wird nur die **Schrift** im Bereich (helle, scharfe Striche auf dem dunklen Chat-Feld) – die bewegte
    Lobby dahinter zählt nicht. Hat sich die Schrift geändert, geht das Bild des Bereichs an den gewählten Dienst –
    höchstens alle 2 s (Gemini: 6,5 s), höchstens 300-mal am Tag (einstellbar: „Daily limit“). Geschickt wird nur der
-   Streifen mit den neuen Zeilen – das Programm erkennt, wie weit der Chat gescrollt ist.
+   Streifen mit den neuen Zeilen – das Programm erkennt, wie weit der Chat gescrollt ist. Zeigt der Bereich keine
+   Chat-Zeilen (Chat zu, dahinter das Spielbild), wird nichts geschickt; liest der Dienst in einem Bild gar keine
+   Nachricht, wartet das Programm vor der nächsten Anfrage (15 s, dann jeweils doppelt so lang, höchstens 5 min).
 4. Der Dienst liest jede Nachricht, fügt umgebrochene Zeilen zusammen, erkennt die Sprache und übersetzt in deine
    Zielsprache; zurück kommen Name, Original, Sprache und Übersetzung.
    Läuft der Chat schnell, hebt das Programm Zwischenbilder auf und schickt sie gestapelt mit der nächsten Anfrage,
