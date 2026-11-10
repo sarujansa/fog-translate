@@ -98,6 +98,7 @@ jobs:
           # the way an update from the program takes: /update=1 installs over it and starts the program again
           # (no -Wait: it would also wait for the program the setup starts; WaitForExit waits for the setup alone)
           $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/update=1", "/DIR=`"$dir`"" -PassThru
+          $null = $p.Handle      # keeps the handle, so ExitCode is there after the process ended
           if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "Setup /update=1 endete nicht in 5 Minuten" }
           if ($p.ExitCode -ne 0) { throw "Setup /update=1: Code $($p.ExitCode)" }
           $running = $null
