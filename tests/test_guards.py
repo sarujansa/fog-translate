@@ -119,3 +119,34 @@ def test_the_setup_waits_for_the_program_by_the_same_mutex_name():
     assert "Check: IsUpdate" in iss and "/update=1" in r.install_args()
     for lang in ("Italian", "Russian", "ChineseSimplified", "Japanese", "Korean"):
         assert "compiler:Languages\\%s.isl" % lang in iss
+
+
+def test_the_setup_shows_the_terms_in_the_chosen_language():
+    """en/de are exactly the two halves of LICENSE; every other language is a complete translation that names the
+    English text as the one that applies. All are UTF-8 with BOM (Inno Setup reads them as ANSI otherwise)."""
+    root = os.path.dirname(ROOT)
+    with open(os.path.join(root, "LICENSE"), encoding="utf-8") as fh:
+        de, en = fh.read().split("\nDEUTSCH\n", 1)[1].split("\nENGLISH\n", 1)
+    with open(os.path.join(root, "installer", "fogtranslate.iss"), encoding="utf-8") as fh:
+        iss = fh.read()
+    assert "LicenseFile=" not in iss
+    codes = re.findall(r'^Name: "(\w+)"; MessagesFile: "[^"]+"; LicenseFile: "terms\\terms_(\w+)\.txt"$', iss, re.M)
+    assert codes == [(c, c) for c in ("en", "de", "it", "ru", "zh", "ja", "ko")]
+    for code, _ in codes:
+        path = os.path.join(root, "installer", "terms", "terms_%s.txt" % code)
+        with open(path, "rb") as fh:
+            raw = fh.read()
+        assert raw.startswith(b"\xef\xbb\xbf") and b"\r" not in raw, code
+        text = raw[3:].decode("utf-8")
+        assert text.startswith("Fog Translate – ") and "Copyright (c) 2026 senisinx." in text.splitlines()[1], code
+        assert re.findall(r"^(\d)\. ", text, re.M) == list("12345678"), code
+        for name in ("GitHub", "Behaviour Interactive", "Dead by Daylight", "Easy Anti-Cheat", "Anthropic", "Google",
+                     "Ollama", "Claude", "Gemini", "THIRD_PARTY.md"):
+            assert name in text, (code, name)
+        if code == "en":
+            assert text.split("\n", 2)[2] == en
+        elif code == "de":
+            assert text.split("\n", 2)[2].rstrip("\n") == de.rstrip("\n")
+        else:
+            assert "LICENSE" in text.split("\n8. ", 1)[1], code       # the closing note names the text that applies
+            assert len(text) > 0.3 * len(en), code

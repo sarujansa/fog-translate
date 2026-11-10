@@ -1,0 +1,44 @@
+﻿Fog Translate – Terms of use
+Copyright (c) 2026 senisinx. All rights reserved.
+
+1. Use and sharing. You may download and use Fog Translate free of charge. You may pass
+   the unmodified program on to others free of charge as long as these terms stay with
+   it (easiest: share the link to the GitHub repository).
+
+2. Modifying only with permission. Modifying, editing, translating or further developing
+   the program or its source code (in whole or in part), and distributing or publishing
+   modified versions, is only permitted with the author's prior written permission
+   (e.g. ask in a GitHub issue). Selling it is not permitted. Viewing and forking on
+   GitHub under GitHub's Terms of Service remain unaffected.
+
+3. Unofficial. Fog Translate is an unofficial fan tool. It is not affiliated with
+   Behaviour Interactive (Dead by Daylight), Epic Games (Easy Anti-Cheat), Anthropic,
+   Google, Ollama or their partners, and it has not been reviewed or approved by them.
+   "Dead by Daylight" and related names are trademarks of their respective owners.
+
+4. At your own risk. You use the program at your own risk. Fog Translate only reads
+   screen pixels and window information, does not modify game files, does not access
+   the game process and sends no input to the game. Still, nobody can promise how
+   Behaviour Interactive or an anti-cheat system judges an external program. There is
+   no assurance that using it will not lead to a warning, a ban or the loss of a game
+   account. Whether you use it is your decision; following the game's rules is your
+   responsibility.
+
+5. Translation services and other people's data. With Claude (Anthropic) or Gemini
+   (Google), a picture of the marked chat area is sent to that provider – with your own
+   account and API key. The picture can show other players' names and messages. You are
+   responsible for using these services, their costs, following their terms, and for
+   data protection towards other players. With Ollama the picture stays on your
+   computer. Translations can be wrong.
+
+6. No warranty. The program is provided "as is", without warranty of any kind,
+   including accuracy, availability or fitness for a particular purpose.
+
+7. Liability. To the extent permitted by law, the author is not liable for any damage
+   arising from the use of or the inability to use the program, in particular not for
+   bans or the loss of game accounts, costs of translation services, progress or data.
+   Liability for intent and gross negligence and for injury to life, body or health
+   remains unaffected.
+
+8. Third-party parts. The libraries the program uses (see THIRD_PARTY.md) are subject
+   to their own licenses; these terms do not apply to them.

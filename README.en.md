@@ -64,7 +64,8 @@ needed. The setup is not signed: Windows SmartScreen asks on the first start (Mo
 **Check for updates** shows a new version, **Download update** fetches the setup and checks its SHA-256,
 **Install and restart** installs it and starts again – settings and keys stay. The window comes in English,
 Italian, Russian, Chinese (Simplified), Japanese and Korean ("Language", default: as Windows, else English) and in a
-light or dark look ("Appearance"); the setup itself speaks these languages too.
+light or dark look ("Appearance"); the setup itself speaks these languages too and shows the terms of use in
+the chosen language (translations for convenience; the English text in `LICENSE` is the one that applies).
 
 **From source:**
 

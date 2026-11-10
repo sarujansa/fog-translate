@@ -23,19 +23,20 @@ UninstallDisplayIcon={app}\FogTranslate.exe
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-LicenseFile=..\LICENSE
 CloseApplications=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
+; the terms of use come in the language chosen at the start (UTF-8 with BOM; en/de are the two halves of LICENSE,
+; the others translations that name the English text as the one that applies)
 [Languages]
-Name: "en"; MessagesFile: "compiler:Default.isl"
-Name: "de"; MessagesFile: "compiler:Languages\German.isl"
-Name: "it"; MessagesFile: "compiler:Languages\Italian.isl"
-Name: "ru"; MessagesFile: "compiler:Languages\Russian.isl"
-Name: "zh"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
-Name: "ja"; MessagesFile: "compiler:Languages\Japanese.isl"
-Name: "ko"; MessagesFile: "compiler:Languages\Korean.isl"
+Name: "en"; MessagesFile: "compiler:Default.isl"; LicenseFile: "terms\terms_en.txt"
+Name: "de"; MessagesFile: "compiler:Languages\German.isl"; LicenseFile: "terms\terms_de.txt"
+Name: "it"; MessagesFile: "compiler:Languages\Italian.isl"; LicenseFile: "terms\terms_it.txt"
+Name: "ru"; MessagesFile: "compiler:Languages\Russian.isl"; LicenseFile: "terms\terms_ru.txt"
+Name: "zh"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"; LicenseFile: "terms\terms_zh.txt"
+Name: "ja"; MessagesFile: "compiler:Languages\Japanese.isl"; LicenseFile: "terms\terms_ja.txt"
+Name: "ko"; MessagesFile: "compiler:Languages\Korean.isl"; LicenseFile: "terms\terms_ko.txt"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

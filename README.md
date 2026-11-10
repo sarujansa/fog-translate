@@ -72,7 +72,8 @@ füllt die Liste mit den installierten Modellen.
 signiert: Windows SmartScreen fragt beim ersten Start (Weitere Informationen → Trotzdem ausführen). Updates:
 **Check for updates** zeigt eine neue Version, **Download update** lädt das Setup und prüft seine SHA-256,
 **Install and restart** installiert es und startet neu – Einstellungen und Keys bleiben. Das Setup selbst gibt es
-auch auf Italienisch, Russisch, Chinesisch, Japanisch und Koreanisch.
+auch auf Italienisch, Russisch, Chinesisch, Japanisch und Koreanisch – samt Nutzungsbedingungen in der gewählten
+Sprache (Übersetzungen zur Orientierung; maßgeblich ist der englische Text in `LICENSE`).
 
 **Aus dem Quelltext:**
 
