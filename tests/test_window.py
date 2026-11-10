@@ -123,8 +123,10 @@ def test_the_selftest_passes(app, tmp_path, monkeypatch):
     import json
     from fogtranslate.selftest import run
     out = tmp_path / "selftest.json"
-    assert run(str(out)) == 0
+    code = run(str(out))
     result = json.loads(out.read_text(encoding="utf-8"))
+    failed = {k: v for k, v in result["checks"].items() if not v["ok"]}
+    assert code == 0, failed
     assert result["ok"] and result["checks"]["logo"]["info"] > 1000
 
 
