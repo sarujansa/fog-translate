@@ -672,3 +672,14 @@ def test_a_stopped_look_thread_does_not_report_its_failed_start():
     loop.start()
     loop.join(2)
     assert q.empty()
+
+
+def test_chinese_japanese_and_korean_are_target_languages(tmp_path):
+    from fogtranslate.translate import LANGUAGES, instruction
+    for code, prompt in (("zh", "Target language: Chinese (Simplified)."), ("ja", "Target language: Japanese."),
+                         ("ko", "Target language: Korean.")):
+        assert code in LANGUAGES and instruction(code) == prompt
+        s = Settings(str(tmp_path))
+        s["target"] = code
+        s.save()
+        assert Settings(str(tmp_path))["target"] == code          # kept, not reset to German
