@@ -34,6 +34,7 @@ DEFAULTS = {
     "read_background": True,         # also read with DBD behind another window – only if nothing covers the chat
     "font_px": 18,
     "close_to_tray": False,          # closing the window keeps the program running in the tray
+    "setup_done": False,             # the setup assistant was finished or skipped
     "hide_hotkey": "Ctrl+Alt+T",     # hides/shows the translations ("" = none)
     "spent": {},                     # "YYYY-MM" → estimated USD
     "requests": {},                  # "YYYY-MM-DD" → count

@@ -70,7 +70,9 @@ alte Fassung, Einstellungen und Keys bleiben.
 1. Python 3.12–3.14 von python.org installieren.
 2. `start.bat` doppelklicken (beim ersten Mal werden die Pakete installiert, alle Versionen fest und per SHA-256
    geprüft).
-3. Dienst wählen, API-Key eintragen (nicht bei Ollama), Hinweis bestätigen.
+3. Beim ersten Start führt der **Einrichtungs-Assistent** durch Dienst, API-Key (mit Test) und Hinweis – später
+   jederzeit über „Setup assistant“. Der Key wird nie im Installer abgefragt, sondern im Programm und dort sofort
+   verschlüsselt gespeichert.
 4. DBD öffnen (Lobby mit sichtbarem Chat), **Mark chat area**: das Programm zeigt ein Standbild des Spiels – Rahmen um
    den ganzen Chat ziehen (etwas breiter als die längste Zeile), **Save**. Dann **Start**.
 

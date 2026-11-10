@@ -65,7 +65,9 @@ settings and keys stay.
 1. Install Python 3.12–3.14 from python.org.
 2. Download this repository (green **Code** button → **Download ZIP**, or `git clone`) and double-click
    `start.bat` (the first start installs the packages; every version is pinned and checked by SHA-256).
-3. Choose a service, paste your API key (not needed for Ollama), confirm the notice.
+3. At the first start the **setup assistant** walks through service, API key (with a test) and the notice – later
+   any time via "Setup assistant". The key is never asked for by the installer, only in the program, where it is
+   stored encrypted at once.
 4. Open DBD (lobby with the chat visible), **Mark chat area**: drag a box around the whole chat (a little wider
    than the longest line), **Save**. Then **Start**.
 

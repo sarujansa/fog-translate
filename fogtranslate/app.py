@@ -209,6 +209,8 @@ class MainWindow(QWidget):
         bottom = QHBoxLayout()
         self.costs = QLabel()
         bottom.addWidget(self.costs, 1)
+        self.setup_btn = QPushButton("Setup assistant", clicked=self.open_setup)
+        bottom.addWidget(self.setup_btn)
         self.update_btn = QPushButton("Check for updates", clicked=self.update_clicked)
         bottom.addWidget(self.update_btn)
         root.addLayout(bottom)
@@ -317,6 +319,28 @@ class MainWindow(QWidget):
         from .hotkey import Hotkey
         self.hotkey = Hotkey(self.settings["hide_hotkey"], self.toggle_overlay)
         return self.hotkey.start(app)
+
+    def open_setup(self):
+        """The setup assistant (also shown by itself at the very first start)."""
+        from .wizard import SetupWizard
+        if self.running:
+            self.toggle()
+        self.wizard = SetupWizard(self.settings, self._setup_done)
+        self.wizard.show()
+        self.wizard.raise_()
+        self.wizard.activateWindow()
+
+    def _setup_done(self):
+        """Take over what the assistant stored."""
+        self.wizard = None
+        s = self.settings
+        self._filling = True
+        self.service.setCurrentIndex(self.service.findData(s["service"]))
+        self.target.setCurrentIndex(self.target.findData(s["target"]))
+        self._filling = False
+        self._service_ui()
+        self._refresh()
+        self.show_window()
 
     def _cap_changed(self, value: int):
         self.settings["daily_cap"] = int(value)
@@ -702,4 +726,7 @@ def run(argv=None) -> int:
     if win.setup_hotkey(app):
         log.info("Hotkey %s hides/shows the translations", settings["hide_hotkey"])
     win.show()
+    from . import wizard
+    if wizard.wanted(settings):
+        win.open_setup()
     return app.exec()
