@@ -85,6 +85,8 @@ Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_AP
 
 ## Bedienung
 
+- **Zielsprache:** Deutsch, Englisch, Französisch, Spanisch, Italienisch, Portugiesisch, Polnisch, Russisch,
+  Türkisch, Niederländisch, Chinesisch (vereinfacht), Japanisch, Koreanisch. Gelesen wird jede Sprache und Schrift.
 - **Test service** prüft Key, Modell und Dienst mit einem erfundenen Beispiel-Chat und zeigt die Antwortzeit.
 - **Overlay:** Schriftgröße und Anzeigedauer im Fenster. **Strg+Alt+T** blendet die Übersetzungen aus und wieder ein
   (auch über das Symbol im Infobereich).

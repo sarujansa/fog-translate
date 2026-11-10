@@ -22,7 +22,8 @@ MAX_TOKENS_DEFAULT = 4096
 MAX_FIELD = 500
 
 LANGUAGES = {"de": "German", "en": "English", "fr": "French", "es": "Spanish", "it": "Italian",
-             "pt": "Portuguese", "pl": "Polish", "ru": "Russian", "tr": "Turkish", "nl": "Dutch"}
+             "pt": "Portuguese", "pl": "Polish", "ru": "Russian", "tr": "Turkish", "nl": "Dutch",
+             "zh": "Chinese (Simplified)", "ja": "Japanese", "ko": "Korean"}
 
 SYSTEM = (
     "You read a cropped screenshot of the text chat of the video game Dead by Daylight (lobby or end-of-match "

@@ -77,6 +77,8 @@ picture once. Keys can also come from `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
 
 ## Using it
 
+- **Target language:** German, English, French, Spanish, Italian, Portuguese, Polish, Russian, Turkish, Dutch,
+  Chinese (Simplified), Japanese, Korean. Messages in any language and script are read.
 - **Test service** checks key, model and service with a made-up sample chat and shows the answer time.
 - **Overlay:** text size and display time are set in the window. **Ctrl+Alt+T** hides and shows the translations
   (also from the tray icon).
