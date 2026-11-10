@@ -4,7 +4,7 @@ Live-Übersetzung des Dead-by-Daylight-Chats (Windows). Der Nutzer markiert den 
 Zeilen schickt das Programm das Bild des Bereichs an den gewählten Dienst – Claude, Gemini oder lokal Ollama (liest +
 erkennt Sprache + übersetzt in einem Schritt)
 und zeigt neue fremdsprachige Zeilen in einem klickdurchlässigen Fenster über dem Chat. Eigenständig, unabhängig
-von Fog Scout (`sarujansa/fog-scout`); Code daraus darf kopiert werden (gleicher Autor). Oberfläche **Englisch** (Wunsch des Nutzers, 0.6), Doku Deutsch,
+von Fog Scout (`senisinx/fog-scout`); Code daraus darf kopiert werden (gleicher Autor). Oberfläche **Englisch** (Wunsch des Nutzers, 0.6), Doku Deutsch,
 Code und Kommentare Englisch.
 
 **Lizenz** (Wunsch des Nutzers, 0.7.4): eigene Bedingungen in `LICENSE` – nutzen und unverändert kostenlos
@@ -98,6 +98,6 @@ Pakete: alle Versionen fest **mit SHA-256** (`tools/hash_requirements.py`), Inst
 
 ## Arbeitsweise
 
-Nutzer: Saru, Deutsch, direkt und kritisch. Commits als `sarujansa <80452583+sarujansa@users.noreply.github.com>`,
+Nutzer: Saru, Deutsch, direkt und kritisch. Commits als `senisinx <80452583+senisinx@users.noreply.github.com>`,
 ohne Co-Authored-By-/Session-Zeilen, PR-Beschreibungen ohne „Generated with Claude Code“. Nach dem Push PR öffnen,
 bei grüner CI selbst mergen. Version in `fogtranslate/__init__.py` erhöhen, README anpassen.

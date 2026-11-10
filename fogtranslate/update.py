@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 from . import __version__
 
-REPO_URL = "https://github.com/sarujansa/fog-translate"
+REPO_URL = "https://github.com/senisinx/fog-translate"
 RELEASES_URL = REPO_URL + "/releases/latest"
-VERSION_URL = "https://raw.githubusercontent.com/sarujansa/fog-translate/main/fogtranslate/__init__.py"
+VERSION_URL = "https://raw.githubusercontent.com/senisinx/fog-translate/main/fogtranslate/__init__.py"
 BRANCH = "main"
 GIT_TIMEOUT_S = 60
 MAX_BYTES = 64 * 1024

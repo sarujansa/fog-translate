@@ -9,7 +9,7 @@ stehen, liest ein KI-Modell sie (jede Schrift: Kyrillisch, Koreanisch, Japanisch
 Akzenten …), erkennt die Sprache und übersetzt sie. Die Übersetzung erscheint in einem kleinen, klickdurchlässigen Fenster
 direkt über dem Chat.
 
-Eigenständiges Programm, unabhängig von [Fog Scout](https://github.com/sarujansa/fog-scout) – beide laufen
+Eigenständiges Programm, unabhängig von [Fog Scout](https://github.com/senisinx/fog-scout) – beide laufen
 nebeneinander.
 
 ## So funktioniert es
@@ -59,7 +59,7 @@ füllt die Liste mit den installierten Modellen.
 
 ## Installieren
 
-**Einfach:** Unter [Releases](https://github.com/sarujansa/fog-translate/releases/latest) die Datei
+**Einfach:** Unter [Releases](https://github.com/senisinx/fog-translate/releases/latest) die Datei
 `FogTranslate-Setup-<Version>.exe` laden und starten – keine Admin-Rechte, kein Python nötig. Das Setup ist nicht
 signiert: Windows SmartScreen fragt beim ersten Start (Weitere Informationen → Trotzdem ausführen). Updates:
 **Check for updates** zeigt eine neue Version und öffnet die Release-Seite; das neue Setup installiert über die
