@@ -75,6 +75,15 @@ alte Fassung, Einstellungen und Keys bleiben.
 Test ohne Spiel: `.venv\Scripts\python -m fogtranslate --test chat.png [--service gemini]` übersetzt einen
 Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_API_KEY`.
 
+## Bedienung
+
+- **Test service** prüft Key, Modell und Dienst mit einem erfundenen Beispiel-Chat und zeigt die Antwortzeit.
+- **Overlay:** Schriftgröße und Anzeigedauer im Fenster. **Strg+Alt+T** blendet die Übersetzungen aus und wieder ein
+  (auch über das Symbol im Infobereich).
+- **Infobereich (Tray):** Fenster zeigen, Start/Stop, Übersetzungen aus/ein, Beenden. Mit „Keep running in the tray
+  when I close the window“ läuft das Programm weiter, wenn du das Fenster schließt.
+- Unten steht, wie lange die letzte Antwort gebraucht hat.
+
 ## Updates
 
 Knopf **Check for updates** unten rechts – das Programm fragt GitHub nur auf diesen Klick.

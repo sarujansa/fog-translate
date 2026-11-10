@@ -47,6 +47,7 @@ class Engine:
         self._not_before = -1e9      # after a limit answer
         self._pending = None
         self.last_counts = {}       # numbers of the last answer, for the log (never text)
+        self.last_seconds = 0.0     # how long the last answer took
         self.last_sent = None        # the last picture sent (in memory only) – "Letzten Ausschnitt zeigen"
 
     @_locked
@@ -130,7 +131,9 @@ class Engine:
         self.error = ""
         added, replaced = self.transcript.add(outcome.lines)
         self.last_counts = {"read": len(outcome.lines), "foreign": sum(1 for ln in outcome.lines if ln.translate),
-                            "new": len(added), "replaced": len(replaced)}
+                            "new": len(added), "replaced": len(replaced),
+                            "seconds": round(float(getattr(outcome, "seconds", 0.0)), 2)}
+        self.last_seconds = float(getattr(outcome, "seconds", 0.0))
         t = self.clock()
         for old_key, line in replaced.items():
             self.shown.pop(old_key, None)

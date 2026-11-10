@@ -288,7 +288,7 @@ def test_broken_settings_fall_back_to_defaults(tmp_path):
                                             '"service": "x", "ollama_port": 0, "accepted": ["x", "gemini"]}',
                                             encoding="utf-8")
     s = Settings(str(tmp_path))
-    assert s["region"] is None and s["target"] == "de" and s["claude_model"] == "claude-opus-5-5"
+    assert s["region"] is None and s["target"] == "de" and s["claude_model"] == "claude-haiku-5-5"
     assert s["service"] == "claude" and s["ollama_port"] == 11434 and s["accepted"] == ["gemini"]
 
 
@@ -446,7 +446,7 @@ def test_earlier_translations_stay_on_screen_while_the_chat_is_active():
     assert [ln.sender for ln in eng.visible()] == ["Snoggles", "Meg"]
     t[0] = 46.0                                      # nothing new for more than 25 s
     assert eng.visible() == []
-    assert eng.last_counts == {"read": 2, "foreign": 2, "new": 1, "replaced": 0}
+    assert eng.last_counts == {"read": 2, "foreign": 2, "new": 1, "replaced": 0, "seconds": 0.0}
 
 
 def test_a_doubled_misreading_does_not_replace_the_message():

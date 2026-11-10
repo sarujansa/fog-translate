@@ -33,6 +33,8 @@ DEFAULTS = {
     "hide_in_captures": False,       # True: the overlay is left out of screenshots/recordings (Windows)
     "read_background": True,         # also read with DBD behind another window – only if nothing covers the chat
     "font_px": 18,
+    "close_to_tray": False,          # closing the window keeps the program running in the tray
+    "hide_hotkey": "Ctrl+Alt+T",     # hides/shows the translations ("" = none)
     "spent": {},                     # "YYYY-MM" → estimated USD
     "requests": {},                  # "YYYY-MM-DD" → count
 }
@@ -95,6 +97,10 @@ class Settings:
             self.values["look_s"] = DEFAULTS["look_s"]
         if float(self.values["min_gap_s"]) == 3.0:
             self.values["min_gap_s"] = DEFAULTS["min_gap_s"]
+        if not 10 <= int(self.values["font_px"]) <= 48:
+            self.values["font_px"] = DEFAULTS["font_px"]
+        if not 3 <= float(self.values["show_s"]) <= 600:
+            self.values["show_s"] = DEFAULTS["show_s"]
         if not 10 <= int(self.values["daily_cap"]) <= 5000:
             self.values["daily_cap"] = DEFAULTS["daily_cap"]
         if not 1 <= int(self.values["ollama_port"]) <= 65535:

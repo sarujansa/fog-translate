@@ -43,6 +43,11 @@ Abhängigkeiten in `THIRD_PARTY.md` eintragen (Wächter `test_every_package_is_l
   Setup still installieren/prüfen/deinstallieren; Job `release` (einziger mit `contents: write`) nur bei Push auf
   `main` und nur wenn es `v<Version>` noch nicht gibt. Die .exe aktualisiert nie selbst: „Check for updates“ liest
   die Versionszeile und öffnet `update.RELEASES_URL`.
+- **Hotkey** (0.9, `hotkey.py`): nur `RegisterHotKey` für die eine eingestellte Kombination (`hide_hotkey`, Standard
+  Strg+Alt+T; braucht Strg/Alt/Win oder eine F-Taste) – Windows meldet sie dem eigenen Programm über Qts nativen
+  Ereignisfilter. Kein Tastatur-Hook, kein Lesen anderer Tasten, nichts ans Spiel.
+- **„Test service“** schickt nur das erfundene Beispielbild `translate.sample_picture` (nie den Bildschirm), bei
+  Cloud-Diensten erst nach bestätigtem Hinweis; zählt als Anfrage.
 - API-Key nur DPAPI-verschlüsselt (`secret.py`), nie Klartext, nie ins Log; ohne DPAPI nur für die Sitzung.
 - Antworten des Dienstes nur als Klartext anzeigen, Steuerzeichen/Bidi entfernt (`translate.parse`).
 - Wächter: `tests/test_guards.py`. Neue Features, die gegen diese Regeln verstoßen: nachfragen.
@@ -74,9 +79,10 @@ kamen die Klicks beim Nutzer nicht an). `QT_ENABLE_HIGHDPI_SCALING=0` bleibt zus
 | `secret.py`, `config.py` | DPAPI, `Settings` in `%LOCALAPPDATA%\FogTranslate` (`FOGTRANSLATE_DATA_DIR` in Tests; Keys je Dienst `api_key(service)`, `accepted(service)`, übernimmt 0.1-Schlüssel) |
 | `update.py`, `deps.py` | Update auf Klick (`check` → `Check.state` current/behind/ahead/dirty/branch/newer/error, `apply` = `merge --ff-only`, `restart`), Pakete nach Update (`needed`, `main`, nur Standardbibliothek) |
 | `qtgeom.py` | Physische ↔ Qt-Pixel (`ratio` = devicePixelRatio des Hauptbildschirms) |
+| `hotkey.py` | `parse` („Ctrl+Alt+T“ → Modifikatoren, Taste), `message_id` (WM_HOTKEY aus der nativen Nachricht), `Hotkey.start/stop` (RegisterHotKey + Filter, Fehler nie in die Ereignisschleife) |
 | `selftest.py` | `--selftest RESULT.json`: Module, Bibliotheken, Fenster offscreen, Logo; JSON, Exit 0 = ok (CI prüft die .exe damit) |
 | `icon.py` | Logo per QPainter (zwei Sprechblasen + Nebel, `paint`/`pixmap`/`icon`, `SIZES`), `set_app_id` (eigenes Taskleisten-Symbol), `ico_bytes`/`save_ico` (für .exe und Setup); `assets/logo.png` erzeugt `tools/export_logo.py` – nach Änderungen an der Zeichnung neu erzeugen |
-| `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig; je Nachricht Kopfzeile Sprache + Name, Übersetzung, Original klein; Messen und Zeichnen über dieselben `rows`/`_height`), Verlauf `history_html` (alles escaped), Bereich markieren (`app.pick_region`: eigene Fenster weg, nach 350 ms ein mss-Bild des Spielfensters → `RegionPicker(picture, done, current)` mit `Canvas` in Bildpixeln, Save/Cancel/Esc/Enter/×), Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads), Start/`--test`; `__main__._log_setup`: Log, unbehandelte Fehler aller Threads ins Log, `faulthandler` → `crash.txt` |
+| `overlay.py`, `picker.py`, `app.py`, `__main__.py` | Übersetzungsfenster (klickdurchlässig; je Nachricht Kopfzeile Sprache + Name, Übersetzung, Original klein; Messen und Zeichnen über dieselben `rows`/`_height`), Verlauf `history_html` (alles escaped), Bereich markieren (`app.pick_region`: eigene Fenster weg, nach 350 ms ein mss-Bild des Spielfensters → `RegionPicker(picture, done, current)` mit `Canvas` in Bildpixeln, Save/Cancel/Esc/Enter/×), Steuerfenster (Thread → Fenster nur über `queue` + QTimer, nie Qt-Signal aus Threads; „Test service“ `test_service`/`_tested`, Antwortzeit `last_seconds` in der Kostenzeile und im Log, Schriftgröße/Anzeigedauer `_look_changed`, Tray `setup_tray` + `close_to_tray`, `toggle_overlay`/`overlay_hidden`; `setQuitOnLastWindowClosed(False)`, `closeEvent` beendet), Start/`--test`; `__main__._log_setup`: Log, unbehandelte Fehler aller Threads ins Log, `faulthandler` → `crash.txt` |
 
 ## Starten, Testen
 
