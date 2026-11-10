@@ -30,7 +30,7 @@ Abhängigkeiten in `THIRD_PARTY.md` eintragen (Wächter `test_every_package_is_l
   nur der Port einstellbar); HTTP nur über `http.py` (keine Weiterleitungen, Antwort ≤ `MAX_BYTES`). Gesendet nur
   das Bild des Bereichs (PNG im Speicher, nie als Datei) und die Zielsprache. Vor dem ersten Start eines
   Cloud-Dienstes bestätigt der Nutzer, dass das Bild Spielernamen/Nachrichten anderer zeigen kann (`accepted` je
-  Dienst; bei Gemini mit Hinweis auf die Datennutzung der kostenlosen Stufe). Grenzen: `min_gap_s`, `daily_cap`, nur bei geändertem + ruhigem Bild
+  Dienst; bei Gemini mit Hinweis auf die Datennutzung der kostenlosen Stufe). Grenzen: `min_gap_s`, `daily_cap` (im Fenster einstellbar, 10–5000, `NoWheelSpinBox`; Anhebung nach erreichtem Limit liest weiter; Anzeige „Today n / cap“), nur bei geändertem + ruhigem Bild
   (`change.ChangeGate`), Gemini ≥ `engine.SERVICE_GAP_S`, nach „Limit erreicht“ `QUOTA_WAIT_S` Pause.
 - **Updates nur auf Klick** („Nach Updates suchen“, `update.py`): Git-Installation `git fetch origin main` (ohne
   Hooks, ohne Passwortabfrage), dann nur Fast-Forward – nie bei geänderten Dateien, anderem Zweig oder eigenen

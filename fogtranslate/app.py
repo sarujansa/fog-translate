@@ -8,7 +8,7 @@ from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QPushButton, QTextBrowser, QVBoxLayout, QWidget)
+                               QPushButton, QSpinBox, QTextBrowser, QVBoxLayout, QWidget)
 
 from . import __version__, geometry, ollama, qtgeom, services, translate, window
 from .config import Settings
@@ -51,6 +51,19 @@ NOTICES = {
                "model, e.g. \"ollama pull qwen2.5vl:7b\" (about 6 GB, needs a GPU with 8 GB or more) or "
                "\"gemma3:4b\" for smaller cards."),
 }
+
+
+MIN_CAP, MAX_CAP = 10, 5000
+
+
+class NoWheelSpinBox(QSpinBox):
+    """The mouse wheel never changes the limit while scrolling past it – only when the field has focus."""
+
+    def wheelEvent(self, event):
+        if self.hasFocus():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
 
 
 class NoWorker:
@@ -132,6 +145,17 @@ class MainWindow(QWidget):
         self.key_link.setOpenExternalLinks(True)
         self.key_link.setTextFormat(Qt.TextFormat.RichText)
         grid.addWidget(self.key_link, 4, 1)
+        grid.addWidget(QLabel("Daily limit:"), 5, 0)
+        limit_row = QHBoxLayout()
+        self.daily_cap = NoWheelSpinBox()
+        self.daily_cap.setRange(MIN_CAP, MAX_CAP)
+        self.daily_cap.setSingleStep(50)
+        self.daily_cap.setSuffix(" requests per day")
+        self.daily_cap.setValue(int(s["daily_cap"]))
+        self.daily_cap.valueChanged.connect(self._cap_changed)
+        limit_row.addWidget(self.daily_cap)
+        limit_row.addStretch(1)
+        grid.addLayout(limit_row, 5, 1)
         root.addLayout(grid)
 
         self.show_all = QCheckBox("Also show messages already in my language")
@@ -166,6 +190,15 @@ class MainWindow(QWidget):
         self._update = None          # last update.Check
         self.resize(560, 560)
         self._service_ui()
+
+    def _cap_changed(self, value: int):
+        self.settings["daily_cap"] = int(value)
+        self.settings.save()
+        e = self.engine
+        if e.status == "cap" and self.settings.requests_today(datetime.now().strftime("%Y-%m-%d")) < value:
+            e.status = "watching"                 # raised above today's count: go on, read the chat again
+            e.gate.reset()
+        self._refresh()
 
     def _service_ui(self):
         """Model list, key row and notice for the chosen service."""
@@ -482,8 +515,9 @@ class MainWindow(QWidget):
         self.run_btn.setText("Stop" if self.running else "Start")
         now = datetime.now()
         spent = float(self.settings["spent"].get(now.strftime("%Y-%m"), 0.0))
-        self.costs.setText("Today %d requests · this month about $%.2f (estimated)"
-                           % (self.settings.requests_today(now.strftime("%Y-%m-%d")), spent))
+        self.costs.setText("Today %d / %d requests · this month about $%.2f (estimated)"
+                           % (self.settings.requests_today(now.strftime("%Y-%m-%d")), int(self.settings["daily_cap"]),
+                              spent))
 
     def closeEvent(self, event):
         self._stop_looper()
