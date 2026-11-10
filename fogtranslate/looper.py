@@ -36,6 +36,11 @@ class Looper(threading.Thread):
     def stop(self):
         self.stop_event.set()
 
+    def _failed(self, error):
+        """A stopped looper (settings changed while it started) says nothing: its message would stop the new one."""
+        if not self.stop_event.is_set():
+            self.post(("start_failed", error))
+
     def _grab_without_us(self, grabber):
         from .grab import blank
 
@@ -49,11 +54,11 @@ class Looper(threading.Thread):
         try:
             translator = self.make_translator()
         except TranslateError as e:
-            self.post(("start_failed", e))
+            self._failed(e)
             return
         except Exception as e:
             log.exception("Übersetzer nicht gestartet")
-            self.post(("start_failed", TranslateError("other", type(e).__name__)))
+            self._failed(TranslateError("other", type(e).__name__))
             return
         if self.stop_event.is_set():
             return
@@ -70,7 +75,7 @@ class Looper(threading.Thread):
                 grabber = self._grabber_factory()
             except Exception as e:
                 log.exception("Bildschirmaufnahme nicht gestartet")
-                self.post(("start_failed", TranslateError("other", type(e).__name__)))
+                self._failed(TranslateError("other", type(e).__name__))
                 return
             while not self.stop_event.is_set():
                 now = time.monotonic()

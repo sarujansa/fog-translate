@@ -22,6 +22,7 @@ SEAM = 6                         # dark rows between stacked pictures
 ERROR_WAIT_S = 10.0              # after any other failed request
 QUOTA_WAIT_S = 60.0              # after a "limit reached" answer, wait at least this long
 SERVICE_GAP_S = {"gemini": 6.5}  # Gemini's free tier allows about 10 requests a minute
+BILLED_ERRORS = ("answer", "refused")   # the service answered (and charged), but nothing usable came back
 
 
 def _locked(fn):
@@ -51,6 +52,7 @@ class Engine:
         self._pending = None
         self._backlog: list = []     # earlier pictures whose lines may have scrolled out of the current one
         self._ref = None             # text of the newest picture that is kept or sent
+        self._open = 0               # requests sent, answer not yet counted (counted in the window's thread)
         self.last_counts = {}       # numbers of the last answer, for the log (never text)
         self.last_seconds = 0.0     # how long the last answer took
         self.last_sent = None        # the last picture sent (in memory only) – "Letzten Ausschnitt zeigen"
@@ -88,6 +90,8 @@ class Engine:
         img = grab(box)
         if img is None:
             return
+        if self._pending is not None and self._pending.shape[1:] != img.shape[1:]:
+            self._forget()                   # the area changed size (marked again, window resized)
         if self.status in ("idle", "no_game", "background", "covered", "no_region"):
             self.status = "watching"
         fired = self.gate.look(img)
@@ -120,6 +124,41 @@ class Engine:
         shift = scroll_shift(ref, mask)
         return shift is None or shift >= KEEP_AT * height
 
+    def _forget(self):
+        """Drop what waits to be sent and what counts as sent: pictures of another size cannot be stacked."""
+        self.gate.reset()
+        self._pending = None
+        self._backlog = []
+        self._ref = None
+
+    @_locked
+    def new_area(self):
+        """The chat area was marked again: start over with it."""
+        self._forget()
+        self.transcript.clear()
+        self.shown.clear()
+
+    @_locked
+    def cap_raised(self):
+        """The daily limit was raised above today's count: go on and read the chat again."""
+        if self.status == "cap":
+            self.status = "watching"
+            self.gate.reset()
+
+    @_locked
+    def starting(self, worker):
+        self.worker = worker
+        self.status, self.error = "starting", ""
+
+    @_locked
+    def started(self):
+        if self.status == "starting":
+            self.status = "idle"
+
+    @_locked
+    def failed(self, error):
+        self.status, self.error = "error", error.kind
+
     def _keep(self, img, mask):
         """The unsent picture moves to the backlog, the current one becomes the pending one."""
         if self._pending is not None:
@@ -149,13 +188,14 @@ class Engine:
         if self.worker.busy or t - self._last_request < gap or t < self._not_before:
             return
         day = self.now().strftime("%Y-%m-%d")
-        if self.settings.requests_today(day) >= int(self.settings["daily_cap"]):
+        if self.settings.requests_today(day) + self._open >= int(self.settings["daily_cap"]):
             self.status = "cap"
             self._pending = None
             self._backlog = []
             return
         picture = self._stacked()
         if self.worker.submit(picture):
+            self._open += 1
             self.last_sent = picture
             self._last_request = t
             self._pending = None
@@ -166,16 +206,16 @@ class Engine:
     def answer(self, outcome) -> bool:
         """A finished request (in the Qt thread). True when the transcript changed."""
         n = self.now()
+        self._open = max(0, self._open - 1)
         if isinstance(outcome, TranslateError):
+            if outcome.kind in BILLED_ERRORS:
+                self.settings.count_request(n.strftime("%Y-%m-%d"), n.strftime("%Y-%m"), 0.0)
             self.status = "error"
             self.error = outcome.kind
             self.last_counts = {}
             # the picture of that request never arrived: forget what counts as sent, so the whole chat goes out
             # again – after a pause, so a lasting error (no key, no network) is not hammered every 2 s
-            self.gate.reset()
-            self._pending = None
-            self._backlog = []
-            self._ref = None
+            self._forget()
             wait = QUOTA_WAIT_S if outcome.kind == "quota" else ERROR_WAIT_S
             self._not_before = self.clock() + wait
             return False

@@ -30,6 +30,7 @@ STATUS = {
     "asking": "Translating …",
     "cap": "Daily request limit reached – paused until tomorrow.",
     "error": "Error",
+    "unconfirmed": "Stopped: please confirm the notice below for this service, then press Start.",
 }
 ERRORS = {
     "key": "API key missing or invalid.",
@@ -345,10 +346,8 @@ class MainWindow(QWidget):
     def _cap_changed(self, value: int):
         self.settings["daily_cap"] = int(value)
         self.settings.save()
-        e = self.engine
-        if e.status == "cap" and self.settings.requests_today(datetime.now().strftime("%Y-%m-%d")) < value:
-            e.status = "watching"                 # raised above today's count: go on, read the chat again
-            e.gate.reset()
+        if self.settings.requests_today(datetime.now().strftime("%Y-%m-%d")) < value:
+            self.engine.cap_raised()
         self._refresh()
 
     def _service_ui(self):
@@ -568,16 +567,14 @@ class MainWindow(QWidget):
         if rel is not None:
             self.settings["region"] = list(rel)
             self.settings.save()
-            self.engine.gate.reset()
-            self.engine.transcript.clear()
+            self.engine.new_area()            # also drops waiting pictures of the old size
         self._refresh()
 
     # ---------------------------------------------------------------- loop
     def _start_looper(self):
         """(Re)start the look thread; it builds the translator itself, so the window never waits."""
         self._stop_looper()
-        self.engine.worker = NoWorker()
-        self.engine.status, self.engine.error = "starting", ""
+        self.engine.starting(NoWorker())
         settings = self.settings
         game = window.find_game()
         log.info("Start: service %s, scale %.2f, game window %s, chat area %s", settings["service"], qtgeom.ratio(),
@@ -595,6 +592,13 @@ class MainWindow(QWidget):
             self.looper = None
 
     def _start_worker(self):            # settings changed while running
+        if not self.settings.accepted(self.settings["service"]):
+            # another cloud service, or the notice unticked: nothing goes out until it is confirmed
+            self.running = False
+            self._stop_looper()
+            self.engine.status = "unconfirmed"
+            self.overlay.hide()
+            return
         self._start_looper()
 
     def toggle(self):
@@ -625,12 +629,11 @@ class MainWindow(QWidget):
             elif kind == "tick":
                 self.game = value
             elif kind == "started":
-                if self.engine.status == "starting":
-                    self.engine.status = "idle"
+                self.engine.started()
             elif kind == "start_failed":
                 self.running = False
                 self._stop_looper()
-                self.engine.status, self.engine.error = "error", value.kind
+                self.engine.failed(value)
             elif kind == "answer":
                 if self.engine.answer(value):
                     self._render_history()

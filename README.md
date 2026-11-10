@@ -32,7 +32,7 @@ nebeneinander.
 ## Was das Programm tut – und was nicht
 
 - Liest **nur Bildschirmpixel** des markierten Bereichs (wie OBS oder Discord-Bildschirmfreigabe). Ist DBD im
-  Hintergrund, nur solange kein anderes Fenster über dem Chat liegt (abschaltbar).
+  Hintergrund, nur solange kein anderes Fenster über dem Chat liegt (abschaltbar; im Zweifel gilt der Chat als verdeckt).
 - **Keine Eingaben ans Spiel**, kein Zugriff auf den Spielprozess, keine Spieldateien. Es schreibt nichts in den
   Chat.
 - Das Übersetzungsfenster ist in Screenshots und Aufnahmen sichtbar; wer das nicht will, setzt das Häkchen
@@ -41,6 +41,9 @@ nebeneinander.
 - **Internet:** nur zum gewählten Dienst (siehe unten). Gesendet wird das Bild des markierten Bereichs – **es kann
   Spielernamen und Nachrichten anderer Spieler zeigen** – und die Zielsprache. Nur wenn sich dort etwas geändert
   hat, höchstens alle 2 s (Gemini: 6,5 s), höchstens 300 Anfragen am Tag (einstellbar im Fenster: „Daily limit“, 10–5000; danach Pause bis Mitternacht).
+- Ein Cloud-Dienst sendet erst, wenn sein Hinweis bestätigt ist – auch beim Wechsel des Dienstes während des
+  Laufens (sonst stoppt das Programm). Antworten, die der Dienst berechnet, aber nicht lesbar sind, zählen
+  zum Tageslimit.
 - API-Keys werden mit Windows-DPAPI verschlüsselt gespeichert, nie im Klartext und nie im Log.
 
 ## Dienste
@@ -54,7 +57,8 @@ Schriften am zuverlässigsten, braucht aber länger.
 | **Gemini** (Google) | kostenloser API-Key von https://aistudio.google.com/apikey | kostenlose Stufe (ca. 10 Anfragen/min, Tageskontingent; Verfügbarkeit je nach Region) | gehen an Google; in der kostenlosen Stufe darf Google sie zur Produktverbesserung nutzen |
 | **Ollama** (lokal) | [Ollama](https://ollama.com) + Bildmodell, z. B. `ollama pull qwen2.5vl:7b` (≈ 6 GB, Grafikkarte ≥ 8 GB) oder `gemma3:4b` | gratis | bleiben auf dem PC |
 
-Bei Ollama spricht das Programm nur mit `127.0.0.1` (Port einstellbar, Standard 11434). „Load local models“
+Bei Ollama spricht das Programm nur mit `127.0.0.1` (Port einstellbar, Standard 11434), auch an einem
+eingestellten Proxy vorbei – das Bild verlässt den PC nicht. „Load local models“
 füllt die Liste mit den installierten Modellen.
 
 ## Installieren
