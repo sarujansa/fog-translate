@@ -4,15 +4,17 @@ from __future__ import annotations
 import logging
 import queue
 import sys
+import time
 from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QPushButton, QSpinBox, QTextBrowser, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+                               QLineEdit, QPushButton, QSpinBox, QTabWidget, QTextBrowser, QVBoxLayout, QWidget)
 
 from . import __version__, geometry, i18n, ollama, qtgeom, services, theme, translate, window
 from .config import Settings
 from .engine import Engine
+from .lines import ChatLine
 from .i18n import N_, tr
 from .looper import Looper
 from .overlay import TranslationOverlay
@@ -54,6 +56,26 @@ NOTICES = {
                "model, e.g. \"ollama pull qwen2.5vl:7b\" (about 6 GB, needs a GPU with 8 GB or more) or "
                "\"gemma3:4b\" for smaller cards."),
 }
+
+
+# the line under the status: the one thing to do next
+HINTS = {
+    "notice": N_("Next: confirm the notice for this service."),
+    "key": N_("Next: paste your API key."),
+    "region": N_("Next: open Dead by Daylight with the chat visible, then mark the chat area."),
+    "ready": N_("Everything is set up – press Start."),
+    "no_game": N_("Open Dead by Daylight – the translation goes on by itself."),
+    "bad_key": N_("Check the API key on the “Service” tab."),
+    "cap": N_("You can raise the daily limit on the “Service” tab."),
+    "running": N_("Translations appear above the chat."),
+}
+DOT = {"off": "#8a8f99", "on": "#3fb950", "wait": "#d29922", "bad": "#e5534b"}     # stopped, working, waiting, error
+# the button for the next step stands out (white on this blue: contrast 4.6)
+NEXT_STYLE = ("QPushButton { background: #2f6fdb; color: #ffffff; border: 2px solid #2f6fdb; border-radius: 4px; "
+              "padding: 4px 16px; font-weight: 600; } "
+              "QPushButton:hover { background: #3d7cea; border-color: #3d7cea; } "
+              "QPushButton:pressed { background: #2559b3; border-color: #2559b3; } "
+              "QPushButton:focus { border-color: #b9d2ff; }")
 
 
 THEME_LABELS = {"auto": N_("Automatic (Windows)"), "light": N_("Light"), "dark": N_("Dark")}
@@ -98,8 +120,11 @@ class MainWindow(QWidget):
         self.tray = None
         self.hotkey = None
         self._quitting = False
+        self._preview_until = 0.0    # a made-up translation is on screen until then ("Preview")
+        self._preview_box = None
+        self._start_after_pick = False   # Start was clicked without a chat area: start once it is marked
         self._build()
-        self.resize(560, 600)
+        self.resize(560, 560)
         self.pump_timer = QTimer(self, interval=200, timeout=self._pump)
         self.pump_timer.start()
         self._refresh()
@@ -108,20 +133,60 @@ class MainWindow(QWidget):
     def _build(self):
         s = self.settings
         root = QVBoxLayout(self)
+
+        # what the program is doing, and the one thing to do next
+        head = QHBoxLayout()
+        self.dot = QLabel()
+        self.dot.setFixedSize(12, 12)
+        head.addWidget(self.dot, 0, Qt.AlignmentFlag.AlignVCenter)
         self.status = QLabel()
         self.status.setWordWrap(True)
-        root.addWidget(self.status)
+        font = self.status.font()
+        font.setPointSizeF(font.pointSizeF() * 1.2)
+        font.setBold(True)
+        self.status.setFont(font)
+        head.addWidget(self.status, 1)
+        root.addLayout(head)
+        hint_row = QHBoxLayout()
+        self.hint = QLabel()
+        self.hint.setWordWrap(True)
+        hint_row.addWidget(self.hint, 1)
+        self.hint_btn = QPushButton(tr("Show me"), clicked=self._hint_clicked)
+        self.hint.setMinimumHeight(self.hint_btn.sizeHint().height())
+        hint_row.addWidget(self.hint_btn)
+        root.addLayout(hint_row)
+        self._hint_step = ""
+        self._looks = {}             # widget → style last set (set only when it changes)
 
         row = QHBoxLayout()
-        self.test_btn = QPushButton(tr("Test service"), clicked=self.test_service)
-        self.pick_btn = QPushButton(tr("Mark chat area"), clicked=self.pick_region)
-        self.shot_btn = QPushButton(tr("Show last capture"), clicked=self.show_last_picture)
         self.run_btn = QPushButton(tr("Start"), clicked=self.toggle)
-        row.addWidget(self.pick_btn)
-        row.addWidget(self.shot_btn)
-        row.addWidget(self.run_btn)
+        self.run_btn.setMinimumHeight(36)
+        self.pick_btn = QPushButton(tr("Mark chat area"), clicked=self.pick_region)
+        self.pick_btn.setMinimumHeight(36)
+        row.addWidget(self.run_btn, 2)
+        row.addWidget(self.pick_btn, 1)
         root.addLayout(row)
 
+        self.tabs = QTabWidget()
+        root.addWidget(self.tabs, 1)
+
+        # ---- tab 1: what was translated
+        page = QWidget()
+        box = QVBoxLayout(page)
+        self.history = QTextBrowser()
+        self.history.setOpenLinks(False)
+        self.history.setPlaceholderText(tr("Translated messages appear here."))
+        box.addWidget(self.history, 1)
+        under = QHBoxLayout()
+        under.addStretch(1)
+        self.shot_btn = QPushButton(tr("Show last capture"), clicked=self.show_last_picture)
+        under.addWidget(self.shot_btn)
+        box.addLayout(under)
+        self.tabs.addTab(page, tr("Translations"))
+
+        # ---- tab 2: the service and what it needs
+        self.service_tab = page = QWidget()
+        box = QVBoxLayout(page)
         grid = QGridLayout()
         grid.addWidget(QLabel(tr("Translate to:")), 0, 0)
         self.target = QComboBox()
@@ -151,10 +216,10 @@ class MainWindow(QWidget):
         key_row = QHBoxLayout()
         self.key = QLineEdit()
         self.key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.key.returnPressed.connect(self._save_key)
         key_row.addWidget(self.key)
         self.key_btn = QPushButton(tr("Save"), clicked=self._save_key)
         key_row.addWidget(self.key_btn)
-        key_row.addWidget(self.test_btn)
         grid.addLayout(key_row, 3, 1)
         self.key_link = QLabel()
         self.key_link.setOpenExternalLinks(True)
@@ -171,7 +236,27 @@ class MainWindow(QWidget):
         limit_row.addWidget(self.daily_cap)
         limit_row.addStretch(1)
         grid.addLayout(limit_row, 5, 1)
-        grid.addWidget(QLabel(tr("Overlay:")), 6, 0)
+        grid.setColumnStretch(1, 1)
+        box.addLayout(grid)
+        self.notice = QLabel()
+        self.notice.setWordWrap(True)
+        box.addWidget(self.notice)
+        self.accept = QCheckBox(tr("I understand"))
+        self.accept.toggled.connect(self._settings_changed)
+        box.addWidget(self.accept)
+        test_row = QHBoxLayout()
+        self.test_btn = QPushButton(tr("Test service"), clicked=self.test_service)
+        test_row.addWidget(self.test_btn)
+        test_row.addStretch(1)
+        box.addLayout(test_row)
+        box.addStretch(1)
+        self.tabs.addTab(page, tr("Service"))
+
+        # ---- tab 3: everything that is set once
+        page = QWidget()
+        box = QVBoxLayout(page)
+        group = QGroupBox(tr("Translation window"))
+        inner = QVBoxLayout(group)
         look_row = QHBoxLayout()
         self.font_px = NoWheelSpinBox()
         self.font_px.setRange(10, 48)
@@ -186,11 +271,41 @@ class MainWindow(QWidget):
         self.show_s.setSuffix(tr(" s"))
         self.show_s.setValue(int(float(s["show_s"])))
         self.show_s.valueChanged.connect(self._look_changed)
+        self.preview_btn = QPushButton(tr("Preview"), clicked=self.preview_overlay)
         look_row.addWidget(self.font_px)
         look_row.addWidget(self.show_s)
+        look_row.addWidget(self.preview_btn)
         look_row.addStretch(1)
-        grid.addLayout(look_row, 6, 1)
-        grid.addWidget(QLabel(tr("Language:")), 7, 0)
+        inner.addLayout(look_row)
+        self.only_chat = QCheckBox(tr("Show translations only while the chat is visible"))
+        self.only_chat.setChecked(bool(s["hide_without_chat"]))
+        self.only_chat.toggled.connect(self._auto_changed)
+        inner.addWidget(self.only_chat)
+        self.show_all = QCheckBox(tr("Also show messages already in my language"))
+        self.show_all.setChecked(bool(s["show_all"]))
+        self.show_all.toggled.connect(self._settings_changed)
+        inner.addWidget(self.show_all)
+        self.hide_caps = QCheckBox(tr("Hide the translation in screenshots and recordings"))
+        self.hide_caps.setChecked(bool(s["hide_in_captures"]))
+        self.hide_caps.toggled.connect(self._settings_changed)
+        inner.addWidget(self.hide_caps)
+        if s["hide_hotkey"]:
+            inner.addWidget(QLabel(tr("%s hides and shows the translations.") % s["hide_hotkey"]))
+        box.addWidget(group)
+        group = QGroupBox(tr("Program"))
+        inner = QVBoxLayout(group)
+        self.auto_start = QCheckBox(tr("Start automatically when Fog Translate opens"))
+        self.auto_start.setChecked(bool(s["auto_start"]))
+        self.auto_start.toggled.connect(self._auto_changed)
+        inner.addWidget(self.auto_start)
+        self.background = QCheckBox(tr("Also read while DBD is in the background (only while no window covers the chat)"))
+        self.background.setChecked(bool(s["read_background"]))
+        self.background.toggled.connect(self._settings_changed)
+        inner.addWidget(self.background)
+        self.to_tray = QCheckBox(tr("Keep running in the tray when I close the window"))
+        self.to_tray.setChecked(bool(s["close_to_tray"]))
+        self.to_tray.toggled.connect(self._settings_changed)
+        inner.addWidget(self.to_tray)
         ui_row = QHBoxLayout()
         self.language = QComboBox()
         self.language.addItem(tr("Automatic (Windows)"), "auto")
@@ -203,53 +318,24 @@ class MainWindow(QWidget):
             self.theme.addItem(tr(label), name)
         self.theme.setCurrentIndex(max(0, self.theme.findData(s["theme"])))
         self.theme.activated.connect(self._theme_changed)
+        ui_row.addWidget(QLabel(tr("Language:")))
         ui_row.addWidget(self.language)
         ui_row.addWidget(QLabel(tr("Appearance:")))
         ui_row.addWidget(self.theme)
         ui_row.addStretch(1)
-        grid.addLayout(ui_row, 7, 1)
-        root.addLayout(grid)
+        inner.addLayout(ui_row)
+        box.addWidget(group)
+        last = QHBoxLayout()
+        self.setup_btn = QPushButton(tr("Setup assistant"), clicked=self.open_setup)
+        last.addWidget(self.setup_btn)
+        last.addStretch(1)
+        box.addLayout(last)
+        box.addStretch(1)
+        self.tabs.addTab(page, tr("Options"))
 
-        self.show_all = QCheckBox(tr("Also show messages already in my language"))
-        self.show_all.setChecked(bool(s["show_all"]))
-        self.show_all.toggled.connect(self._settings_changed)
-        root.addWidget(self.show_all)
-        self.background = QCheckBox(tr("Also read while DBD is in the background (only while no window covers the chat)"))
-        self.background.setChecked(bool(s["read_background"]))
-        self.background.toggled.connect(self._settings_changed)
-        root.addWidget(self.background)
-        self.auto_start = QCheckBox(tr("Start automatically when Fog Translate opens"))
-        self.auto_start.setChecked(bool(s["auto_start"]))
-        self.auto_start.toggled.connect(self._auto_changed)
-        root.addWidget(self.auto_start)
-        self.only_chat = QCheckBox(tr("Show translations only while the chat is visible"))
-        self.only_chat.setChecked(bool(s["hide_without_chat"]))
-        self.only_chat.toggled.connect(self._auto_changed)
-        root.addWidget(self.only_chat)
-        self.hide_caps = QCheckBox(tr("Hide the translation in screenshots and recordings"))
-        self.hide_caps.setChecked(bool(s["hide_in_captures"]))
-        self.hide_caps.toggled.connect(self._settings_changed)
-        root.addWidget(self.hide_caps)
-        self.to_tray = QCheckBox(tr("Keep running in the tray when I close the window"))
-        self.to_tray.setChecked(bool(s["close_to_tray"]))
-        self.to_tray.toggled.connect(self._settings_changed)
-        root.addWidget(self.to_tray)
-        self.notice = QLabel()
-        self.notice.setWordWrap(True)
-        root.addWidget(self.notice)
-        self.accept = QCheckBox(tr("I understand"))
-        self.accept.toggled.connect(self._settings_changed)
-        root.addWidget(self.accept)
-
-        self.history = QTextBrowser()
-        self.history.setOpenLinks(False)
-        self.history.setPlaceholderText(tr("Translated messages appear here."))
-        root.addWidget(self.history, 1)
         bottom = QHBoxLayout()
         self.costs = QLabel()
         bottom.addWidget(self.costs, 1)
-        self.setup_btn = QPushButton(tr("Setup assistant"), clicked=self.open_setup)
-        bottom.addWidget(self.setup_btn)
         self.update_btn = QPushButton("", clicked=self.update_clicked)
         bottom.addWidget(self.update_btn)
         root.addLayout(bottom)
@@ -267,8 +353,10 @@ class MainWindow(QWidget):
         self.rebuild()
 
     def rebuild(self):
+        tab = self.tabs.currentIndex()
         QWidget().setLayout(self.layout())             # the old layout and its widgets go with this temporary parent
         self._build()
+        self.tabs.setCurrentIndex(tab)                 # the language is chosen on a tab: stay there
         self.setWindowTitle("Fog Translate " + __version__)
         if self.tray is not None:
             self._act_window.setText(tr("Show window"))
@@ -292,10 +380,44 @@ class MainWindow(QWidget):
 
     def can_auto_start(self) -> bool:
         """Start by itself only when a click on Start would work: area marked, notice confirmed, key there."""
+        return bool(self.settings["auto_start"] and not self.running and not self.next_step())
+
+    def next_step(self) -> str:
+        """What Start still needs: "notice" (not confirmed), "key" (none there), "region" (not marked) or ""."""
         s = self.settings
         service = s["service"]
-        return bool(s["auto_start"] and not self.running and s["region"] is not None and s.accepted(service)
-                    and (not services.is_cloud(service) or s.api_key(service)))
+        if not s.accepted(service):
+            return "notice"
+        if services.is_cloud(service) and not s.api_key(service):
+            return "key"
+        if s["region"] is None:
+            return "region"
+        return ""
+
+    def _go(self, step: str):
+        """Bring the place where ``step`` is done to the front."""
+        if step == "region":
+            self.pick_region()
+            return
+        self.tabs.setCurrentWidget(self.service_tab)
+        {"notice": self.accept, "key": self.key, "cap": self.daily_cap}[step].setFocus()
+
+    def _guide(self, step: str):
+        """Start or the test cannot work yet: show where the missing step is done, and say what it is."""
+        self._go(step)
+        if step == "notice":
+            self._say(tr("Please confirm the notice for this service first."))
+        elif step == "key":
+            self._say(tr("Please paste an API key first."))
+
+    def _hint_clicked(self):
+        if self._hint_step:
+            self._go(self._hint_step)
+
+    def _take_typed_key(self):
+        """A key typed but not saved yet is saved before it is needed (Start, test)."""
+        if self.key.text().strip():
+            self._save_key()
 
     def auto_start_now(self) -> bool:
         if not self.can_auto_start():
@@ -308,19 +430,37 @@ class MainWindow(QWidget):
         self.settings["font_px"] = int(self.font_px.value())
         self.settings["show_s"] = float(self.show_s.value())
         self.settings.save()
+        changed = self.overlay.font_main.pixelSize() != self.settings["font_px"]
         self.overlay.set_font_px(self.settings["font_px"])
-        if self.running:
+        if changed and self.isVisible():
+            self.preview_overlay(3.0)                  # the new size is seen at once, with or without the game
+        elif self.running:
             self._refresh_overlay()
+
+    def preview_overlay(self, seconds: float = 6.0):
+        """Show a made-up translation where the real ones appear – in the middle of the screen without the game or
+        a marked area. Nothing is read or sent for it."""
+        game = window.find_game()
+        box = self.engine.region_on_screen(game) if game is not None and not game.minimized else None
+        if box is None:
+            g = QApplication.primaryScreen().geometry()
+            x, y, w, h = qtgeom.from_qt((g.x(), g.y(), g.width(), g.height()), qtgeom.ratio())
+            box = (x + w // 3, y + h // 2, w // 3, 1)
+        self._preview_box = box
+        self._preview_until = time.monotonic() + seconds
+        self._refresh_overlay()
 
     # ---------------------------------------------------------------- test, tray, hotkey
     def test_service(self):
         """One request with a made-up chat picture: shows whether key, model and service work, and how fast."""
+        self._take_typed_key()
         service = self.settings["service"]
-        if not self.settings.accepted(service):
-            self.status.setText(tr("Please confirm the notice below first."))
+        step = self.next_step()
+        if step in ("notice", "key"):                  # the test needs no chat area
+            self._guide(step)
             return
         self.test_btn.setEnabled(False)
-        self.status.setText(tr("Testing %s …") % tr(services.SERVICES[service][0]))
+        self._say(tr("Testing %s …") % tr(services.SERVICES[service][0]), 120)
         settings, put = self.settings, self.results.put
 
         def work():
@@ -421,6 +561,7 @@ class MainWindow(QWidget):
         self.target.setCurrentIndex(self.target.findData(s["target"]))
         self._filling = False
         self._service_ui()
+        self.tabs.setCurrentIndex(0)
         self._refresh()
         self.show_window()
 
@@ -505,7 +646,7 @@ class MainWindow(QWidget):
     def _load_local_models(self):
         names = ollama.installed_models(int(self.settings["ollama_port"]))
         if not names:
-            self.status.setText(tr(ERRORS["server"]) + " " + tr("Or no model pulled yet."))
+            self._say(tr(ERRORS["server"]) + " " + tr("Or no model pulled yet."))
             return
         self._filling = True
         current = self._model_text()
@@ -516,7 +657,7 @@ class MainWindow(QWidget):
         self.model.setCurrentIndex(i if i >= 0 else 0)
         self._filling = False
         self._settings_changed()
-        self.status.setText(tr("%d local models found.") % len(names))
+        self._say(tr("%d local models found.") % len(names))
 
     def _save_key(self):
         text = self.key.text().strip()
@@ -534,7 +675,7 @@ class MainWindow(QWidget):
         """The picture last sent to the service, exactly as cut out (only in memory, never a file)."""
         img = self.engine.last_sent
         if img is None:
-            self.status.setText(tr("Nothing sent yet – start first and wait for chat messages."))
+            self._say(tr("Nothing sent yet – start first and wait for chat messages."))
             return
         from PySide6.QtGui import QImage, QPixmap
         import numpy as np
@@ -707,7 +848,8 @@ class MainWindow(QWidget):
         """Take a still picture of the game (with our own windows out of the way) and mark the chat on it."""
         game = window.find_game()
         if game is None or game.minimized:
-            self.status.setText(tr("Open Dead by Daylight first (not minimised), then mark the chat area."))
+            self._start_after_pick = False
+            self._say(tr("Open Dead by Daylight first (not minimised), then mark the chat area."))
             return
         self.overlay.hide()
         self.hide()                                    # our window must not be in the picture
@@ -726,7 +868,8 @@ class MainWindow(QWidget):
             log.exception("Screenshot for marking failed")
         self.show()
         if picture is None:
-            self.status.setText(tr("Could not take a picture of the game (see log)."))
+            self._start_after_pick = False
+            self._say(tr("Could not take a picture of the game (see log)."))
             return
         log.info("Marking on a picture of %d x %d", picture.shape[1], picture.shape[0])
         self.picker = RegionPicker(picture, self._picked, self.settings["region"])
@@ -735,11 +878,15 @@ class MainWindow(QWidget):
 
     def _picked(self, rel):
         self.picker = None
+        asked, self._start_after_pick = self._start_after_pick, False
         if rel is not None:
             self.settings["region"] = list(rel)
             self.settings.save()
             self.engine.new_area()            # also drops waiting pictures of the old size
-            self.auto_start_now()
+            if asked and not self.running:
+                self.toggle()                 # Start was what the user clicked
+            else:
+                self.auto_start_now()
         self._refresh()
 
     # ---------------------------------------------------------------- loop
@@ -780,10 +927,13 @@ class MainWindow(QWidget):
             self.engine.status = "idle"
             self.overlay.hide()
         else:
-            service = self.settings["service"]
-            if not self.settings.accepted(service):
-                self.status.setText(tr("Please confirm the notice below first."))
+            self._take_typed_key()
+            step = self.next_step()
+            if step:                              # not ready: lead to the missing step instead of a start that fails
+                self._start_after_pick = step == "region"
+                self._guide(step)
                 return
+            self._test_until = 0                  # an earlier message makes way for the status
             self.running = True
             self._start_looper()
         self._refresh()
@@ -819,7 +969,10 @@ class MainWindow(QWidget):
                 elif hasattr(value, "kind"):
                     log.info("Answer: error %s", value.kind)
                 self.settings.save()
-        if self.running:
+        preview_over = bool(self._preview_until) and self._preview_until <= time.monotonic()
+        if preview_over:
+            self._preview_until = 0.0
+        if self.running or self._preview_until or preview_over:
             self._refresh_overlay()
         self._refresh()
 
@@ -827,6 +980,8 @@ class MainWindow(QWidget):
         box = self.engine.region_on_screen(self.game)
         lines = (self.engine.visible() if self.running and box is not None and not self.overlay_hidden
                  and self.engine.chat_shown() else [])
+        if not lines and self._preview_until > time.monotonic():      # real translations come first
+            lines, box = preview_lines(), self._preview_box
         if not lines or self.picker is not None:
             self.overlay.hide()
             return
@@ -839,25 +994,61 @@ class MainWindow(QWidget):
         e = self.engine
         text = tr(STATUS.get(e.status, e.status)) if self.running or e.status not in ("watching", "starting") \
             else tr(STATUS["idle"])
-        if not self.running and self.settings["region"] is None:
+        if not self.running and self.next_step() == "region":
             text = tr(STATUS["no_region"])
+        no_chat = False
         if e.status == "error":
             text = tr(ERRORS.get(e.error, e.error))
         elif self.running and e.status == "watching":
             from .change import MIN_TEXT_PX
             if e.gate.stats.get("text_px", MIN_TEXT_PX) < MIN_TEXT_PX or not e.gate.stats.get("chat", True):
-                text = tr(STATUS["no_chat"])
+                text, no_chat = tr(STATUS["no_chat"]), True
         now = datetime.now()
         if getattr(self, "_test_until", 0) > now.timestamp():
             text = self._test_text                       # the test's result stays readable for a moment
         self.status.setText(text)
         self.run_btn.setText(tr("Stop") if self.running else tr("Start"))
+        # the dot, the hint and its button: what is going on and the one thing to do next
+        step = "" if self.running else self.next_step()
+        look, hint, goal = "off", "", ""
+        if e.status == "error":
+            look = "bad"
+            if e.error == "key" and not step:
+                hint, goal = HINTS["bad_key"], "key"
+        elif self.running:
+            look = "wait"
+            if e.status == "cap":
+                hint, goal = HINTS["cap"], "cap"
+            elif e.status == "no_game":
+                hint = HINTS["no_game"]
+            elif e.status in ("watching", "asking") and not no_chat:
+                look, hint = "on", HINTS["running"]
+        elif e.status == "unconfirmed":
+            look = "bad"
+        if step:
+            hint, goal = HINTS[step], step if step != "region" else ""
+        elif not self.running and e.status != "error":
+            hint = HINTS["ready"]
+        hint = tr(hint) if hint else ""
+        if look == "on" and self.settings["hide_hotkey"]:
+            hint += " " + tr("%s hides and shows the translations.") % self.settings["hide_hotkey"]
+        self.hint.setText(hint)
+        self._hint_step = goal
+        self.hint_btn.setVisible(bool(goal))
+        self._look(self.dot, "background: %s; border-radius: 6px;" % DOT[look])
+        self._look(self.pick_btn, NEXT_STYLE if step == "region" else "")
+        self._look(self.run_btn, NEXT_STYLE if not self.running and not step else "")
         self._tray_texts()
         spent = float(self.settings["spent"].get(now.strftime("%Y-%m"), 0.0))
         last = " · " + tr("last answer %.1f s") % e.last_seconds if e.last_seconds > 0 else ""
         self.costs.setText((tr("Today %d / %d requests · this month about $%.2f (estimated)") + "%s")
                            % (self.settings.requests_today(now.strftime("%Y-%m-%d")), int(self.settings["daily_cap"]),
                               spent, last))
+
+    def _look(self, widget, style: str):
+        if self._looks.get(widget) != style:
+            self._looks[widget] = style
+            widget.setStyleSheet(style)
 
     def closeEvent(self, event):
         if self.settings["close_to_tray"] and self.tray is not None and not self._quitting:
@@ -872,6 +1063,11 @@ class MainWindow(QWidget):
             self.tray.hide()
         super().closeEvent(event)
         QApplication.instance().quit()
+
+
+def preview_lines() -> list:
+    """What "Preview" shows: one made-up message, laid out like a real one."""
+    return [ChatLine("Fog Translate", "Так выглядит перевод.", "ru", tr("This is how a translation looks."), True)]
 
 
 def history_html(lines, colours=theme.HISTORY[True]) -> str:

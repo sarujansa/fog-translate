@@ -40,16 +40,104 @@ def test_starting_without_key_or_notice_is_refused(app):
     _pick(win, "gemini")
     win.toggle()
     assert not win.running and "notice" in win.status.text()
+    assert win.tabs.currentWidget() is win.service_tab        # … and the window shows where to confirm it
+    win._pump()
+    assert "notice" in win.status.text()              # the message stays readable (it was gone after 200 ms)
     win.accept.setChecked(True)
-    win.toggle()                                      # starts at once; the missing key comes from the thread
+    win.toggle()                                      # no key: refused at once, not by a start that fails
+    assert not win.running and "API key" in win.status.text()
+    win.key.setText("AIza-typed")
+    win.settings["region"] = [0.8, 0.5, 0.15, 0.2]
+    win.toggle()                                      # a key typed but not saved is taken
     assert win.running and "Starting" in win.status.text()
-    _wait(win, lambda: not win.running)
-    assert "API key" in win.status.text()
+    assert win.settings.api_key("gemini") == "AIza-typed" and win.key.text() == ""
+    win.toggle()
     _pick(win, "ollama")
     win.toggle()                                      # Ollama needs neither
     assert win.running
     win.toggle()
     assert win.looper is None
+    win.close()
+
+
+def test_start_without_a_chat_area_leads_to_marking_it_and_starts_then(app, monkeypatch):
+    s = Settings()
+    s["service"] = "ollama"
+    s["auto_start"] = False
+    win = MainWindow(s)
+    started, asked = [], []
+    monkeypatch.setattr(win, "_start_looper", lambda: started.append(1))
+    monkeypatch.setattr(win, "pick_region", lambda: asked.append(1))
+    win.toggle()
+    assert asked == [1] and not win.running           # nothing to watch yet: mark first
+    win._picked((0.1, 0.5, 0.3, 0.3))
+    assert win.running and started == [1]             # Start was what was clicked, whatever "auto_start" says
+    win.toggle()
+    win._picked((0.1, 0.5, 0.3, 0.3))                 # marked again later, without Start: stays stopped
+    assert not win.running
+    win.close()
+
+
+def test_without_the_game_marking_says_so_and_forgets_the_start(app):
+    s = Settings()
+    s["service"] = "ollama"
+    win = MainWindow(s)
+    win.toggle()                                      # no game here
+    assert not win.running and "Dead by Daylight" in win.status.text() and not win._start_after_pick
+    win.close()
+
+
+def test_the_hint_names_the_next_step_and_leads_there(app):
+    s = Settings()
+    win = MainWindow(s)
+    assert win.next_step() == "notice" and "notice" in win.hint.text() and not win.hint_btn.isHidden()
+    win.hint_btn.click()
+    assert win.tabs.currentWidget() is win.service_tab
+    win.accept.setChecked(True)
+    assert win.next_step() == "key" and "API key" in win.hint.text()
+    s.session_keys["claude"] = "k"
+    win._refresh()
+    assert win.next_step() == "region" and "mark the chat area" in win.hint.text() and win.hint_btn.isHidden()
+    assert win._looks[win.pick_btn] and not win._looks[win.run_btn]       # the button to press stands out
+    s["region"] = [0.1, 0.5, 0.3, 0.3]
+    win._refresh()
+    assert win.next_step() == "" and "press Start" in win.hint.text()
+    assert win._looks[win.run_btn] and not win._looks[win.pick_btn]
+    win.running = True
+    for status, error, word in (("watching", "", "above the chat"), ("no_game", "", "Open Dead by Daylight"),
+                                ("cap", "", "daily limit"), ("error", "key", "Check the API key"), ("error", "net", "")):
+        win.engine.status, win.engine.error = status, error
+        win.engine.gate.stats = {"text_px": 5000, "chat": True}
+        win._refresh()
+        assert word in win.hint.text() and (win.hint.text() != "" or not word), status
+        assert win.hint_btn.isHidden() == (status not in ("cap", "error") or error == "net"), status
+    win.engine.status = "cap"
+    win._refresh()
+    win.tabs.setCurrentIndex(0)
+    win.hint_btn.click()
+    assert win.tabs.currentWidget() is win.service_tab
+    win.running = False
+    win.close()
+
+
+def test_the_preview_shows_a_made_up_translation_for_a_moment(app):
+    win = MainWindow(Settings())
+    win.preview_overlay(0.05)
+    assert win.overlay.isVisible() and win.overlay.lines[0].sender == "Fog Translate"
+    assert win.overlay.rect_on_screen is not None     # blacked out of any picture like a real translation
+    import time
+    time.sleep(0.08)
+    win._pump()
+    assert not win.overlay.isVisible() and win.engine.last_sent is None
+    win.close()
+
+
+def test_the_language_change_stays_on_its_tab(app):
+    win = MainWindow(Settings())
+    win.tabs.setCurrentIndex(2)
+    win.language.setCurrentIndex(win.language.findData("ja"))
+    win._language_changed()
+    assert win.tabs.currentIndex() == 2 and win.tabs.tabText(1) != "Service"
     win.close()
 
 
@@ -180,6 +268,7 @@ def test_switching_to_an_unconfirmed_service_while_running_stops(app, monkeypatc
     monkeypatch.setattr(services, "make", lambda settings: Quiet())
     settings = Settings()
     settings["region"] = [0.8, 0.5, 0.15, 0.2]
+    settings.session_keys["gemini"] = "k"
     win = MainWindow(settings)
     _pick(win, "ollama")
     win.toggle()
