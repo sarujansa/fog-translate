@@ -106,7 +106,7 @@ def test_choosing_a_language_rebuilds_the_window_and_is_saved(app):
     assert win.update_btn.text() == it["Check for updates"] and win.language.currentData() == "it"
     assert "hello" in win.history.toPlainText()                # what was translated so far is still listed
     win._pump()                                                # the status line comes in the new language
-    assert win.status.text() == it["No chat area marked yet."]
+    assert win.status.text() == it["Stopped."] and win.hint.text() == it["Next: confirm the notice for this service."]
     win.language.setCurrentIndex(win.language.findData("en"))
     win._language_changed()
     assert win.run_btn.text() == "Start"

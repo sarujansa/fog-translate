@@ -91,10 +91,20 @@ Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_AP
 
 ## Bedienung
 
+- **Fenster:** Oben steht, was das Programm gerade tut (Punkt: grau = gestoppt, grün = liest, gelb = wartet, rot =
+  Fehler), darunter der nächste Schritt – fehlt etwas, führt **Show me** an die Stelle, und der Knopf für den
+  nächsten Schritt ist blau. Darunter drei Reiter: **Translations** (die übersetzten Nachrichten), **Service**
+  (Zielsprache, Dienst, Modell, Key, Tageslimit, Hinweis, Test) und **Options** (Übersetzungsfenster, Verhalten,
+  Sprache, Aussehen, Assistent).
+- **Start** führt zum fehlenden Schritt, statt mit einem Fehler zu enden: ohne bestätigten Hinweis oder Key zeigt es
+  die Stelle, ohne markierten Bereich öffnet es das Markieren und startet danach. Ein eingetippter, noch nicht
+  gespeicherter Key wird dabei übernommen (Enter im Feld speichert ihn auch).
 - **Zielsprache:** Deutsch, Englisch, Französisch, Spanisch, Italienisch, Portugiesisch, Polnisch, Russisch,
   Türkisch, Niederländisch, Chinesisch (vereinfacht), Japanisch, Koreanisch. Gelesen wird jede Sprache und Schrift.
 - **Test service** prüft Key, Modell und Dienst mit einem erfundenen Beispiel-Chat und zeigt die Antwortzeit.
-- **Overlay:** Schriftgröße und Anzeigedauer im Fenster. **Strg+Alt+T** blendet die Übersetzungen aus und wieder ein
+- **Overlay:** Schriftgröße und Anzeigedauer unter „Options“; **Preview** zeigt für ein paar Sekunden eine
+  Beispiel-Übersetzung an der Stelle, an der die echten erscheinen (ohne Spiel in der Bildschirmmitte) – auch
+  beim Ändern der Schriftgröße. Dafür wird nichts gelesen oder gesendet. **Strg+Alt+T** blendet die Übersetzungen aus und wieder ein
   (auch über das Symbol im Infobereich).
 - **Nur mit Chat:** Die Übersetzungen stehen nur da, solange im markierten Bereich der Chat zu sehen ist. Verschwindet
   er (Match, Menü ohne Chat, anderes Fenster darüber, DBD minimiert), sind sie nach etwa einer Sekunde weg und

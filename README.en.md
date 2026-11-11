@@ -83,10 +83,20 @@ picture once. Keys can also come from `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
 
 ## Using it
 
+- **Window:** the top line says what the program is doing (dot: grey = stopped, green = reading, yellow = waiting,
+  red = error), the line below names the next step – if something is missing, **Show me** leads to it, and the
+  button for the next step is blue. Below are three tabs: **Translations** (the translated messages), **Service**
+  (target language, service, model, key, daily limit, notice, test) and **Options** (translation window, behaviour,
+  language, appearance, assistant).
+- **Start** leads to the missing step instead of ending in an error: without the confirmed notice or a key it shows
+  where to add it, without a marked area it opens the marking and starts afterwards. A key typed but not saved yet
+  is taken along (Enter in the field saves it too).
 - **Target language:** German, English, French, Spanish, Italian, Portuguese, Polish, Russian, Turkish, Dutch,
   Chinese (Simplified), Japanese, Korean. Messages in any language and script are read.
 - **Test service** checks key, model and service with a made-up sample chat and shows the answer time.
-- **Overlay:** text size and display time are set in the window. **Ctrl+Alt+T** hides and shows the translations
+- **Overlay:** text size and display time are on "Options"; **Preview** shows a sample translation for a few
+  seconds where the real ones appear (in the middle of the screen without the game) – also when the text size
+  changes. Nothing is read or sent for it. **Ctrl+Alt+T** hides and shows the translations
   (also from the tray icon).
 - **Only with the chat:** translations are on screen only while the marked area shows the chat. When it goes away
   (match, a menu without chat, another window over it, DBD minimised) they are gone after about a second and come
