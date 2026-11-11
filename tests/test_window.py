@@ -231,6 +231,22 @@ def test_the_logo_is_drawn_at_every_size(app):
     assert len(ic.availableSizes()) == len(icon.SIZES)
 
 
+def test_every_size_of_the_logo_is_its_own_picture():
+    """0.11.3: the pictures come from fogtranslate/assets, one per size; up to 32 px the simpler variant, so the
+    .ico must keep each picture rather than scale the 256 px one down."""
+    import io
+
+    from PIL import Image
+
+    from fogtranslate import icon
+    ico = Image.open(io.BytesIO(icon.ico_bytes()))
+    assert sorted(ico.info["sizes"]) == [(n, n) for n in icon.SIZES]
+    for n in (16, 32):
+        ico.size = (n, n)
+        with Image.open(icon.path(n)) as own:
+            assert ico.convert("RGBA").tobytes() == own.convert("RGBA").tobytes()
+
+
 def test_the_update_button_follows_the_check(app):
     from fogtranslate.update import Check
     win = MainWindow(Settings())

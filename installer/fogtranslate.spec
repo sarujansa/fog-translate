@@ -13,6 +13,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 PACKAGE = os.path.join(ROOT, "fogtranslate")
 datas = [(os.path.join(ROOT, name), ".") for name in ("LICENSE", "THIRD_PARTY.md", "README.md", "README.en.md")]
+datas.append((os.path.join(PACKAGE, "assets"), os.path.join("fogtranslate", "assets")))  # 0.11.3: the icon pictures (icon.ASSETS)
 hiddenimports = sorted(f"fogtranslate.{name[:-3]}" for name in os.listdir(PACKAGE)
                        if name.endswith(".py") and name != "__init__.py")
 
