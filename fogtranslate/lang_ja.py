@@ -178,4 +178,6 @@ T = {
     'That place covers the chat area – choose one next to it.': "その場所はチャット範囲に重なります – 隣の場所を選んでください。",
     'Position of the translations': "翻訳の位置",
     'Drag a box where the translations should appear – they start at its top left corner. Not on the chat itself. Then click Save.': "翻訳を表示したい場所を枠で囲んでください – 翻訳は枠の左上の角から表示されます。チャットの上には置かないでください。その後「保存」をクリックします。",
+    'Up to date': "最新です",
+    'Check failed': "確認に失敗しました",
 }

@@ -119,7 +119,8 @@ Bildausschnitt einmal. Keys gehen auch über `ANTHROPIC_API_KEY` bzw. `GEMINI_AP
 
 ## Updates
 
-Knopf **Check for updates** unten rechts – das Programm fragt GitHub nur auf diesen Klick.
+Knopf **Check for updates** unten rechts – das Programm fragt GitHub nur auf diesen Klick. Das Ergebnis steht
+oben in der Statuszeile; gibt es nichts Neues, zeigt auch der Knopf kurz „Up to date“ (oder „Check failed“).
 
 - Mit `git clone` installiert: zeigt, ob es Neues gibt; **Update and restart** holt es (nur wenn im
   Ordner nichts geändert wurde) und startet neu. `start.bat` installiert geänderte Pakete dabei automatisch. Ein Klon

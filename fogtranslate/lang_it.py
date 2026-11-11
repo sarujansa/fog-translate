@@ -178,4 +178,6 @@ T = {
     'That place covers the chat area – choose one next to it.': "Quel punto copre l'area della chat – scegline uno accanto.",
     'Position of the translations': "Posizione delle traduzioni",
     'Drag a box where the translations should appear – they start at its top left corner. Not on the chat itself. Then click Save.': "Trascina un riquadro dove devono comparire le traduzioni – partono dal suo angolo in alto a sinistra. Non sopra la chat. Poi fai clic su Salva.",
+    'Up to date': "Aggiornato",
+    'Check failed': "Controllo non riuscito",
 }

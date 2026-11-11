@@ -178,4 +178,6 @@ T = {
     'That place covers the chat area – choose one next to it.': "Это место закрывает область чата – выберите другое рядом.",
     'Position of the translations': "Место для переводов",
     'Drag a box where the translations should appear – they start at its top left corner. Not on the chat itself. Then click Save.': "Выделите рамкой место, где должны появляться переводы, – они начинаются от её левого верхнего угла. Не поверх самого чата. Затем нажмите «Сохранить».",
+    'Up to date': "Актуальная версия",
+    'Check failed': "Проверка не удалась",
 }

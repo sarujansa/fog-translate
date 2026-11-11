@@ -110,7 +110,8 @@ picture once. Keys can also come from `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
 
 ## Updates
 
-**Check for updates** (bottom right) – the program asks GitHub only when you click it.
+**Check for updates** (bottom right) – the program asks GitHub only when you click it. The result is in the status
+line at the top; when there is nothing new, the button itself says "Up to date" (or "Check failed") for a moment.
 
 - Installed with `git clone`: shows whether there is something new; **Update and restart** fetches it (only if
   nothing in the folder was changed) and restarts. `start.bat` installs changed packages automatically. A clone

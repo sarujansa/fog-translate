@@ -116,6 +116,7 @@ class MainWindow(QWidget):
         self._release = None         # installed .exe: the release found, then (path, sha256) once downloaded
         self._setup_file = None
         self._downloading = False
+        self._update_note = ("", 0.0)    # the check's result on the button itself, until then (where the click was)
         self.overlay_hidden = False  # hotkey / tray: translations hidden until toggled again
         self.tray = None
         self.hotkey = None
@@ -731,6 +732,8 @@ class MainWindow(QWidget):
             text = tr("Update and restart")
         elif c is not None and c.state == "newer":
             text = tr("Open download page")
+        elif self._update_note[1] > time.monotonic():
+            text = self._update_note[0]
         self.update_btn.setText(text)
         self.update_btn.setEnabled(on)
 
@@ -774,8 +777,16 @@ class MainWindow(QWidget):
             self._say(tr("Version %s is available (installed: %s).") % (c.remote_version, __version__))
         else:
             self._say(tr(self.UPDATE_TEXT.get(c.state, c.state)))
+            self._note_update(c.state)
         self._update_button()
         log.info("Update-Prüfung: %s", c.state)
+
+    def _note_update(self, state: str, seconds: float = 6.0):
+        """Nothing to install: say so on the button too – the status line is at the other end of the window, and
+        the button only flickering looked as if nothing had happened (Saru, 11.11.2026)."""
+        text = {"current": tr("Up to date"), "error": tr("Check failed")}.get(state)
+        if text:
+            self._update_note = (text, time.monotonic() + seconds)
 
     def _say(self, text: str, seconds: float = 15.0):
         """A message in the status line that stays readable for a moment (the line is rewritten 5× a second)."""
@@ -790,7 +801,9 @@ class MainWindow(QWidget):
         if state == "available":
             self._say(tr("Version %s is available (installed: %s).") % (rel.version, __version__))
         else:
-            self._say(tr(self.UPDATE_TEXT["current" if state == "current" else "error"]))
+            state = "current" if state == "current" else "error"
+            self._say(tr(self.UPDATE_TEXT[state]))
+            self._note_update(state)
         self._update_button()
         log.info("Update-Prüfung: %s %s", state, detail)
 
@@ -1028,6 +1041,9 @@ class MainWindow(QWidget):
                 elif hasattr(value, "kind"):
                     log.info("Answer: error %s", value.kind)
                 self.settings.save()
+        if self._update_note[0] and self._update_note[1] <= time.monotonic():
+            self._update_note = ("", 0.0)
+            self._update_button()                      # back to "Check for updates"
         preview_over = bool(self._preview_until) and self._preview_until <= time.monotonic()
         if preview_over:
             self._preview_until = 0.0
