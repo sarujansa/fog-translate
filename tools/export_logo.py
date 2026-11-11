@@ -1,22 +1,17 @@
-"""Write assets/logo.png (256 px) from fogtranslate/icon.py – run after changing the drawing.
+"""Write assets/logo.png (256 px, shown in the README) from fogtranslate/assets/icon-256.png.
 
     python tools/export_logo.py
+
+The icon pictures themselves come from the fog-forge repository (tools/icons/); copy them into fogtranslate/assets/
+and run this.
 """
 import os
-import sys
+import shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-from PySide6.QtWidgets import QApplication  # noqa: E402
-
-from fogtranslate import icon  # noqa: E402
 
 if __name__ == "__main__":
-    app = QApplication.instance() or QApplication([])
     path = os.path.join(ROOT, "assets", "logo.png")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    if not icon.pixmap(256).save(path, "PNG"):
-        raise SystemExit("could not write " + path)
+    shutil.copyfile(os.path.join(ROOT, "fogtranslate", "assets", "icon-256.png"), path)
     print(path)
