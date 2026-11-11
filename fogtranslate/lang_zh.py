@@ -178,4 +178,6 @@ T = {
     'That place covers the chat area – choose one next to it.': "这个位置遮住了聊天区域 – 请选择旁边的位置。",
     'Position of the translations': "翻译的位置",
     'Drag a box where the translations should appear – they start at its top left corner. Not on the chat itself. Then click Save.': "在希望显示翻译的地方拖出一个方框 – 翻译从方框的左上角开始显示。不要放在聊天上。然后点击“保存”。",
+    'Up to date': "已是最新版本",
+    'Check failed': "检查失败",
 }

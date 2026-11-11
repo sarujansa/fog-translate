@@ -243,6 +243,20 @@ def test_the_update_button_follows_the_check(app):
     win.close()
 
 
+def test_a_check_that_finds_nothing_says_so_on_the_button_for_a_moment(app):
+    from fogtranslate.update import Check
+    win = MainWindow(Settings())
+    win._update_checked(Check("current"))
+    assert win.update_btn.text() == "Up to date" and win.update_btn.isEnabled()
+    assert "up to date" in win.status.text()
+    win._release_checked(("error", None, "offline"))
+    assert win.update_btn.text() == "Check failed"
+    win._update_note = (win._update_note[0], 0.0)     # the moment is over
+    win._pump()
+    assert win.update_btn.text() == "Check for updates"
+    win.close()
+
+
 def test_the_history_is_plain_text_even_if_the_service_sends_markup(app):
     from fogtranslate.app import history_html
     from fogtranslate.lines import ChatLine
