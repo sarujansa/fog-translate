@@ -172,4 +172,10 @@ T = {
     'Translations': "Переводы",
     'Translations appear above the chat.': "Переводы появляются над чатом.",
     'You can raise the daily limit on the “Service” tab.': "Дневной лимит можно увеличить на вкладке «Сервис».",
+    'Choose position': "Выбрать место",
+    'Reset position': "Сбросить место",
+    'Open Dead by Daylight first (not minimised), then choose the position.': "Сначала откройте Dead by Daylight (окно не должно быть свёрнуто), затем выберите место.",
+    'That place covers the chat area – choose one next to it.': "Это место закрывает область чата – выберите другое рядом.",
+    'Position of the translations': "Место для переводов",
+    'Drag a box where the translations should appear – they start at its top left corner. Not on the chat itself. Then click Save.': "Выделите рамкой место, где должны появляться переводы, – они начинаются от её левого верхнего угла. Не поверх самого чата. Затем нажмите «Сохранить».",
 }

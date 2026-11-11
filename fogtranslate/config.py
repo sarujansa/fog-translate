@@ -37,6 +37,7 @@ DEFAULTS = {
     "ui_language": "auto",           # the window's language: "auto" (Windows) or a code from i18n.LANGS
     "theme": "auto",                 # auto (as Windows) | light | dark
     "font_px": 18,
+    "overlay_spot": None,            # [x, y, w, h] like "region": translations start at its top left corner
     "close_to_tray": False,          # closing the window keeps the program running in the tray
     "setup_done": False,             # the setup assistant was finished or skipped
     "hide_hotkey": "Ctrl+Alt+T",     # hides/shows the translations ("" = none)
@@ -89,6 +90,8 @@ class Settings:
                                                   or not geometry.valid_region(self.values["region"])):
             self.values["region"] = None            # also: marked before 0.7.1 → mark again
         self.values["region_space"] = "window"
+        if self.values["overlay_spot"] is not None and not geometry.valid_region(self.values["overlay_spot"]):
+            self.values["overlay_spot"] = None
         if self.values["target"] not in translate.LANGUAGES:
             self.values["target"] = "de"
         if self.values["service"] not in services.SERVICES:

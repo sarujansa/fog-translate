@@ -172,4 +172,10 @@ T = {
     'Translations': "Traduzioni",
     'Translations appear above the chat.': "Le traduzioni compaiono sopra la chat.",
     'You can raise the daily limit on the “Service” tab.': "Puoi aumentare il limite giornaliero nella scheda “Servizio”.",
+    'Choose position': "Scegli posizione",
+    'Reset position': "Ripristina posizione",
+    'Open Dead by Daylight first (not minimised), then choose the position.': "Apri prima Dead by Daylight (non ridotto a icona), poi scegli la posizione.",
+    'That place covers the chat area – choose one next to it.': "Quel punto copre l'area della chat – scegline uno accanto.",
+    'Position of the translations': "Posizione delle traduzioni",
+    'Drag a box where the translations should appear – they start at its top left corner. Not on the chat itself. Then click Save.': "Trascina un riquadro dove devono comparire le traduzioni – partono dal suo angolo in alto a sinistra. Non sopra la chat. Poi fai clic su Salva.",
 }

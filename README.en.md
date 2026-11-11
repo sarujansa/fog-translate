@@ -96,7 +96,10 @@ picture once. Keys can also come from `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
 - **Test service** checks key, model and service with a made-up sample chat and shows the answer time.
 - **Overlay:** text size and display time are on "Options"; **Preview** shows a sample translation for a few
   seconds where the real ones appear (in the middle of the screen without the game) – also when the text size
-  changes. Nothing is read or sent for it. **Ctrl+Alt+T** hides and shows the translations
+  changes. Nothing is read or sent for it. The translations sit right above the chat; **Choose
+  position** sets another place on a still picture of the game (drag a box, the translations start at its top
+  left corner; not on the chat itself), **Reset position** puts them back. The window cannot be dragged with the
+  mouse: it lets every click through to the game. **Ctrl+Alt+T** hides and shows the translations
   (also from the tray icon).
 - **Only with the chat:** translations are on screen only while the marked area shows the chat. When it goes away
   (match, a menu without chat, another window over it, DBD minimised) they are gone after about a second and come

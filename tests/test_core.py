@@ -42,6 +42,13 @@ def test_region_is_clipped_to_the_window_and_tiny_boxes_are_rejected():
     assert geometry.to_relative((500, 500, 10, 10), space) is None
 
 
+def test_a_chosen_place_is_kept_inside_the_screen():
+    screen = (0, 0, 1920, 1080)
+    assert geometry.placed_spot((100, 200, 300, 80), (400, 120), screen) == (100, 200)
+    assert geometry.placed_spot((1800, 1040, 100, 40), (400, 120), screen) == (1520, 960)
+    assert geometry.touches((0, 0, 10, 10), (5, 5, 10, 10)) and not geometry.touches((0, 0, 10, 10), (10, 0, 5, 5))
+
+
 def test_overlay_goes_above_the_region_or_below_it_when_there_is_no_room():
     screen = (0, 0, 3440, 1440)
     assert geometry.overlay_spot((500, 1000, 600, 300), (400, 100), screen) == (500, 894)

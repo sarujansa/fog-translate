@@ -7,6 +7,8 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from fogtranslate.app import MainWindow  # noqa: E402
 from fogtranslate.config import Settings  # noqa: E402
+from fogtranslate.lines import ChatLine  # noqa: E402
+from fogtranslate.translate import Result  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -130,6 +132,62 @@ def test_the_preview_shows_a_made_up_translation_for_a_moment(app):
     win._pump()
     assert not win.overlay.isVisible() and win.engine.last_sent is None
     win.close()
+
+
+def test_the_place_of_the_translations_can_be_chosen_and_reset(app):
+    import types
+    s = Settings()
+    s["region"] = [0.8, 0.5, 0.15, 0.2]
+    win = MainWindow(s)
+    win.pick_spot()                                   # no game here: says so, nothing opens
+    assert "choose the position" in win.status.text() and win.picker is None
+    assert not win.unplace_btn.isEnabled()
+    win._spot_picked((0.75, 0.45, 0.1, 0.1))          # over the chat: its lines could not be read under it
+    assert Settings()["overlay_spot"] is None and "covers the chat" in win.status.text()
+    win._spot_picked(None)                            # cancelled
+    assert Settings()["overlay_spot"] is None
+    win._spot_picked((0.1, 0.2, 0.2, 0.1))
+    assert Settings()["overlay_spot"] == [0.1, 0.2, 0.2, 0.1] and win.unplace_btn.isEnabled()
+    win._preview_until = 0.0
+    win.running = True
+    win.game = types.SimpleNamespace(client=(0, 0, 800, 600), minimized=False)
+    win.engine.chat_seen = True
+    win.engine.answer(Result([ChatLine("Meg", "привет", "ru", "hallo", True)], 0.0))
+    win._refresh_overlay()
+    assert win.overlay.rect_on_screen[:2] == (80, 120)             # the box's top left corner in the game window
+    win.reset_spot()
+    assert Settings()["overlay_spot"] is None and not win.unplace_btn.isEnabled()
+    win._refresh_overlay()
+    x, y, _w, h = win.overlay.rect_on_screen
+    assert (x, y + h + 6) == (640, 300)                            # back right above the chat area
+    win.running = False
+    win.close()
+
+
+def test_a_broken_place_in_the_file_is_dropped(tmp_path):
+    import json
+    s = Settings()
+    s.save()
+    with open(s.path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    data["overlay_spot"] = [2, "x"]
+    with open(s.path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+    assert Settings()["overlay_spot"] is None
+
+
+def test_another_look_builds_the_window_again_so_links_take_its_colour(app):
+    from fogtranslate import theme
+    win = MainWindow(Settings())
+    try:
+        win.tabs.setCurrentIndex(2)
+        old = win.key_link
+        win.theme.setCurrentIndex(win.theme.findData("light"))
+        win._theme_changed()
+        assert win.key_link is not old and win.tabs.currentIndex() == 2 and win.theme.currentData() == "light"
+    finally:
+        theme.apply(app, "auto")
+        win.close()
 
 
 def test_the_language_change_stays_on_its_tab(app):
