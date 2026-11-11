@@ -172,4 +172,10 @@ T = {
     'Translations': "翻译",
     'Translations appear above the chat.': "翻译会显示在聊天上方。",
     'You can raise the daily limit on the “Service” tab.': "可以在“服务”选项卡中提高每日上限。",
+    'Choose position': "选择位置",
+    'Reset position': "重置位置",
+    'Open Dead by Daylight first (not minimised), then choose the position.': "请先打开 Dead by Daylight（不要最小化），然后再选择位置。",
+    'That place covers the chat area – choose one next to it.': "这个位置遮住了聊天区域 – 请选择旁边的位置。",
+    'Position of the translations': "翻译的位置",
+    'Drag a box where the translations should appear – they start at its top left corner. Not on the chat itself. Then click Save.': "在希望显示翻译的地方拖出一个方框 – 翻译从方框的左上角开始显示。不要放在聊天上。然后点击“保存”。",
 }

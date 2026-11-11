@@ -90,17 +90,17 @@ class RegionPicker(QWidget):
     """``picture`` = BGR screenshot of the game's client area (its pixels are screen pixels);
     ``done(rel_or_None)`` – the box relative to the whole game window, or None when cancelled."""
 
-    def __init__(self, picture, done, current=None):
+    def __init__(self, picture, done, current=None, title=None, hint=None):
         super().__init__(None, Qt.WindowType.Window)
-        self.setWindowTitle(tr("Mark chat area"))
+        self.setWindowTitle(title or tr("Mark chat area"))
         h, w = np.asarray(picture).shape[:2]
         self.view = geometry.window_space(w, h)
         self._done = done
         self._finished = False
         box = geometry.from_relative(current, self.view) if current else None
         self.canvas = Canvas(picture, box, self._update_buttons)
-        hint = QLabel(tr("Drag a box around the whole chat – a little wider than the longest line, including the "
-                         "scroll bar. Then click Save."))
+        hint = QLabel(hint or tr("Drag a box around the whole chat – a little wider than the longest line, "
+                                 "including the scroll bar. Then click Save."))
         hint.setWordWrap(True)
         self.save_btn = QPushButton(tr("Save"), clicked=self.save)
         self.save_btn.setDefault(True)

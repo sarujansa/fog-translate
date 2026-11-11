@@ -172,4 +172,10 @@ T = {
     'Translations': "번역",
     'Translations appear above the chat.': "번역은 채팅 위에 표시됩니다.",
     'You can raise the daily limit on the “Service” tab.': "일일 한도는 ‘서비스’ 탭에서 늘릴 수 있습니다.",
+    'Choose position': "위치 선택",
+    'Reset position': "위치 초기화",
+    'Open Dead by Daylight first (not minimised), then choose the position.': "먼저 Dead by Daylight를 연 다음(최소화하지 않은 상태) 위치를 선택하세요.",
+    'That place covers the chat area – choose one next to it.': "그 위치는 채팅 영역을 가립니다 – 옆의 다른 위치를 선택하세요.",
+    'Position of the translations': "번역 위치",
+    'Drag a box where the translations should appear – they start at its top left corner. Not on the chat itself. Then click Save.': "번역이 표시될 곳에 상자를 끌어 그리세요 – 번역은 상자의 왼쪽 위 모서리에서 시작됩니다. 채팅 위에는 두지 마세요. 그런 다음 ‘저장’을 클릭하세요.",
 }

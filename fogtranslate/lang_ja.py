@@ -172,4 +172,10 @@ T = {
     'Translations': "翻訳",
     'Translations appear above the chat.': "翻訳はチャットの上に表示されます。",
     'You can raise the daily limit on the “Service” tab.': "1 日の上限は「サービス」タブで引き上げられます。",
+    'Choose position': "位置を選択",
+    'Reset position': "位置をリセット",
+    'Open Dead by Daylight first (not minimised), then choose the position.': "先に Dead by Daylight を開いてから(最小化しないでください)、位置を選択してください。",
+    'That place covers the chat area – choose one next to it.': "その場所はチャット範囲に重なります – 隣の場所を選んでください。",
+    'Position of the translations': "翻訳の位置",
+    'Drag a box where the translations should appear – they start at its top left corner. Not on the chat itself. Then click Save.': "翻訳を表示したい場所を枠で囲んでください – 翻訳は枠の左上の角から表示されます。チャットの上には置かないでください。その後「保存」をクリックします。",
 }

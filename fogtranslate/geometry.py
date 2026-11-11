@@ -58,6 +58,21 @@ def valid_region(rel) -> bool:
     return 0 <= x < 1 and 0 <= y < 1 and MIN_SIZE <= w and MIN_SIZE <= h and x + w <= 1.0001 and y + h <= 1.0001
 
 
+def placed_spot(box, size, screen) -> tuple[int, int]:
+    """Where the translation window goes when the user chose a place: the top left corner of ``box``, moved only
+    as far as needed to stay inside ``screen``. All in screen coordinates."""
+    w, h = size
+    sx, sy, sw, sh = screen
+    x = min(max(box[0], sx), sx + sw - w)
+    y = min(max(box[1], sy), sy + sh - h)
+    return int(x), int(y)
+
+
+def touches(a, b) -> bool:
+    """Whether two boxes (x, y, w, h) share any area."""
+    return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
+
+
 def overlay_spot(region, size, screen) -> tuple[int, int]:
     """Where the translation window goes: right above the region (left-aligned); below it if there is no room
     above; always inside ``screen`` (x, y, w, h). ``region`` and the result are screen coordinates."""

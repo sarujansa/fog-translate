@@ -122,6 +122,7 @@ class MainWindow(QWidget):
         self._quitting = False
         self._preview_until = 0.0    # a made-up translation is on screen until then ("Preview")
         self._preview_box = None
+        self._preview_place = None   # the place the user chose, on screen, when the preview began
         self._start_after_pick = False   # Start was clicked without a chat area: start once it is marked
         self._build()
         self.resize(560, 560)
@@ -277,6 +278,14 @@ class MainWindow(QWidget):
         look_row.addWidget(self.preview_btn)
         look_row.addStretch(1)
         inner.addLayout(look_row)
+        place_row = QHBoxLayout()
+        self.place_btn = QPushButton(tr("Choose position"), clicked=self.pick_spot)
+        self.unplace_btn = QPushButton(tr("Reset position"), clicked=self.reset_spot)
+        self.unplace_btn.setEnabled(s["overlay_spot"] is not None)
+        place_row.addWidget(self.place_btn)
+        place_row.addWidget(self.unplace_btn)
+        place_row.addStretch(1)
+        inner.addLayout(place_row)
         self.only_chat = QCheckBox(tr("Show translations only while the chat is visible"))
         self.only_chat.setChecked(bool(s["hide_without_chat"]))
         self.only_chat.toggled.connect(self._auto_changed)
@@ -368,7 +377,9 @@ class MainWindow(QWidget):
         self.settings["theme"] = self.theme.currentData()
         self.settings.save()
         theme.apply(QApplication.instance(), self.settings["theme"])
-        self._render_history()                         # its colours follow the look
+        # texts with a link keep the link colour they were made with (a pale link on white after dark → light,
+        # Saru 11.11.2026): build the contents again, as for another language; the list's colours follow too
+        self.rebuild()
 
     def _auto_changed(self, _on=None):
         """Neither box changes what is sent, so the look thread keeps running."""
@@ -447,6 +458,7 @@ class MainWindow(QWidget):
             x, y, w, h = qtgeom.from_qt((g.x(), g.y(), g.width(), g.height()), qtgeom.ratio())
             box = (x + w // 3, y + h // 2, w // 3, 1)
         self._preview_box = box
+        self._preview_place = self._spot_on_screen(game) if game is not None and not game.minimized else None
         self._preview_until = time.monotonic() + seconds
         self._refresh_overlay()
 
@@ -855,7 +867,48 @@ class MainWindow(QWidget):
         self.hide()                                    # our window must not be in the picture
         QTimer.singleShot(350, lambda: self._open_picker(game))
 
-    def _open_picker(self, game):
+    def pick_spot(self):
+        """Choose where the translations appear – on a still picture like the chat area: the translation window
+        lets every click through, and over the game a window of ours gets no clicks, so it cannot be dragged."""
+        game = window.find_game()
+        if game is None or game.minimized:
+            self._say(tr("Open Dead by Daylight first (not minimised), then choose the position."))
+            return
+        self._preview_until = 0.0
+        self.overlay.hide()
+        self.hide()
+        QTimer.singleShot(350, lambda: self._open_picker(game, spot=True))
+
+    def _spot_picked(self, rel):
+        self.picker = None
+        region = self.settings["region"]
+        if rel is not None and region is not None and geometry.touches(rel, region):
+            # the program never reads its own window: chat lines under it would be lost
+            self._say(tr("That place covers the chat area – choose one next to it."))
+        elif rel is not None:
+            self.settings["overlay_spot"] = list(rel)
+            self.settings.save()
+            self.unplace_btn.setEnabled(True)
+            self.preview_overlay()                     # show where they will be
+        self._refresh()
+
+    def reset_spot(self):
+        """Back to the place right above the chat."""
+        self.settings["overlay_spot"] = None
+        self.settings.save()
+        self.unplace_btn.setEnabled(False)
+        self.preview_overlay()
+
+    def _spot_on_screen(self, game):
+        """The chosen place as a screen box, or None (none chosen, no game)."""
+        rel = self.settings["overlay_spot"]
+        if rel is None or game is None:
+            return None
+        cx, cy, cw, ch = game.client
+        x, y, w, h = geometry.from_relative(rel, geometry.window_space(cw, ch))
+        return cx + x, cy + y, w, h
+
+    def _open_picker(self, game, spot=False):
         picture = None
         try:
             from .grab import Grabber
@@ -872,7 +925,13 @@ class MainWindow(QWidget):
             self._say(tr("Could not take a picture of the game (see log)."))
             return
         log.info("Marking on a picture of %d x %d", picture.shape[1], picture.shape[0])
-        self.picker = RegionPicker(picture, self._picked, self.settings["region"])
+        if spot:
+            self.picker = RegionPicker(
+                picture, self._spot_picked, self.settings["overlay_spot"], tr("Position of the translations"),
+                tr("Drag a box where the translations should appear – they start at its top left corner. "
+                   "Not on the chat itself. Then click Save."))
+        else:
+            self.picker = RegionPicker(picture, self._picked, self.settings["region"])
         screen = QApplication.primaryScreen().availableGeometry()
         self.picker.start((screen.width(), screen.height()))
 
@@ -980,15 +1039,19 @@ class MainWindow(QWidget):
         box = self.engine.region_on_screen(self.game)
         lines = (self.engine.visible() if self.running and box is not None and not self.overlay_hidden
                  and self.engine.chat_shown() else [])
+        place = self._spot_on_screen(self.game)
         if not lines and self._preview_until > time.monotonic():      # real translations come first
-            lines, box = preview_lines(), self._preview_box
+            lines, box, place = preview_lines(), self._preview_box, self._preview_place
         if not lines or self.picker is not None:
             self.overlay.hide()
             return
         screen = QApplication.screenAt(self.overlay.geometry().center()) or QApplication.primaryScreen()
         g = screen.geometry()
         area = qtgeom.from_qt((g.x(), g.y(), g.width(), g.height()), qtgeom.ratio())
-        self.overlay.show_lines(lines, lambda size: geometry.overlay_spot(box, size, area))
+        if place is not None:
+            self.overlay.show_lines(lines, lambda size: geometry.placed_spot(place, size, area))
+        else:
+            self.overlay.show_lines(lines, lambda size: geometry.overlay_spot(box, size, area))
 
     def _refresh(self):
         e = self.engine
