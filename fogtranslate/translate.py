@@ -89,8 +89,8 @@ class Result:
 
 
 def png_bytes(img) -> bytes:
-    # compress_level 1: ~10× faster than optimize=True for a few more KB (measured 125 ms → see tests)
-    """BGR numpy picture → PNG bytes, longest side ≤ MAX_SIDE (Pillow, in memory)."""
+    """BGR numpy picture → PNG bytes, longest side ≤ MAX_SIDE (Pillow, in memory). ``compress_level=1``: a
+    700×600 chat in 7 ms instead of 36 ms with ``optimize=True``, for 38 instead of 33 KB (measured 14.11.2026)."""
     from PIL import Image
     import numpy as np
     a = np.asarray(img)

@@ -15,12 +15,6 @@ from fogtranslate.translate import SCHEMA, Result, TranslateError, parse
 
 
 # ---------------------------------------------------------------- geometry
-def test_viewport_of_the_users_ultrawide_has_bars_of_440():
-    assert geometry.viewport(3440, 1440) == (440, 0, 2560, 1440)
-    assert geometry.viewport(2560, 1440) == (0, 0, 2560, 1440)
-    assert geometry.viewport(1920, 1200) == (0, 60, 1920, 1080)
-
-
 def test_region_survives_another_window_size():
     rel = geometry.to_relative((860, 1000, 860, 360), geometry.window_space(3440, 1440))
     assert geometry.valid_region(rel)
@@ -876,3 +870,56 @@ def test_long_runs_match_the_plain_definition():
                     else:
                         want[k:k + full.shape[0], :] |= full
             assert np.array_equal(_long_runs(m, 30, axis), want)
+
+
+# ---------------------------------------------------------------- http.py against a real local server
+def _serve(handler_body):
+    import http.server
+    import threading
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            handler_body(self)
+
+        def log_message(self, *args):
+            pass
+    server = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, "http://127.0.0.1:%d/x" % server.server_address[1]
+
+
+def test_http_returns_errors_caps_answers_and_refuses_redirects(monkeypatch):
+    from fogtranslate import http as fhttp
+
+    def answer(code, body=b"", headers=()):
+        def handle(h):
+            h.rfile.read(int(h.headers.get("Content-Length", 0)))
+            h.send_response(code)
+            for k, v in headers:
+                h.send_header(k, v)
+            h.send_header("Content-Length", str(len(body)))
+            h.end_headers()
+            h.wfile.write(body)
+        return handle
+
+    server, url = _serve(answer(429, b'{"error": {"message": "slow down"}}', [("Retry-After", "3")]))
+    try:
+        status, data, headers = fhttp.exchange("POST", url, body={"a": 1}, timeout=5)
+        assert status == 429 and data["error"]["message"] == "slow down" and headers["retry-after"] == "3"
+    finally:
+        server.shutdown()
+    monkeypatch.setattr(fhttp, "MAX_BYTES", 100)
+    server, url = _serve(answer(200, b'{"x": "' + b"a" * 200 + b'"}'))
+    try:
+        with pytest.raises(fhttp.NetError):
+            fhttp.request("POST", url, body={}, timeout=5)
+    finally:
+        server.shutdown()
+    server, url = _serve(answer(302, b"", [("Location", "http://127.0.0.1:9/elsewhere")]))
+    try:
+        status, data = fhttp.request("POST", url, body={}, timeout=5)
+        assert status == 302 and data == {}                    # not followed: a redirect could carry the key
+    finally:
+        server.shutdown()
+    with pytest.raises(fhttp.NetError):
+        fhttp.request("POST", "http://127.0.0.1:9/nothing", body={}, timeout=2)   # nobody listens

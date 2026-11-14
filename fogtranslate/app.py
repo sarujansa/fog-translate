@@ -19,37 +19,14 @@ from .i18n import N_, tr
 from .looper import Looper
 from .overlay import TranslationOverlay
 from .picker import RegionPicker
+from .statusview import HINTS, STATUS, View, view
+from .updateflow import UpdateFlow
 
 log = logging.getLogger(__name__)
 
-STATUS = {
-    "idle": N_("Stopped."),
-    "no_region": N_("No chat area marked yet."),
-    "no_game": N_("Dead by Daylight not found – waiting."),
-    "background": N_("DBD is not in the foreground – paused."),
-    "covered": N_("A window covers the chat – paused until it is visible again."),
-    "starting": N_("Starting …"),
-    "watching": N_("Watching the chat …"),
-    "no_chat": N_("Waiting for the chat … no text found in the marked area (never there? mark it again)"),
-    "asking": N_("Translating …"),
-    "cap": N_("Daily request limit reached – paused until tomorrow."),
-    "error": N_("Error"),
-    "unconfirmed": N_("Stopped: please confirm the notice below for this service, then press Start."),
-}
 ERRORS, NOTICES = services.ERRORS, services.NOTICES
 
 
-# the line under the status: the one thing to do next
-HINTS = {
-    "notice": N_("Next: confirm the notice for this service."),
-    "key": N_("Next: paste your API key."),
-    "region": N_("Next: open Dead by Daylight with the chat visible, then mark the chat area."),
-    "ready": N_("Everything is set up – press Start."),
-    "no_game": N_("Open Dead by Daylight – the translation goes on by itself."),
-    "bad_key": N_("Check the API key on the “Service” tab."),
-    "cap": N_("You can raise the daily limit on the “Service” tab."),
-    "running": N_("Translations appear above the chat."),
-}
 DOT = {"off": "#8a8f99", "on": "#3fb950", "wait": "#d29922", "bad": "#e5534b"}     # stopped, working, waiting, error
 # the button for the next step stands out (white on this blue: contrast 4.6)
 NEXT_STYLE = ("QPushButton { background: #2f6fdb; color: #ffffff; border: 2px solid #2f6fdb; border-radius: 4px; "
@@ -80,7 +57,7 @@ class NoWorker:
         return False
 
 
-class MainWindow(QWidget):
+class MainWindow(UpdateFlow, QWidget):
     def __init__(self, settings: Settings):
         super().__init__()
         self.settings = settings
@@ -93,11 +70,7 @@ class MainWindow(QWidget):
         self.overlay = TranslationOverlay(settings["font_px"])
         self.overlay.hide_in_captures = bool(settings["hide_in_captures"])
         self.picker = None
-        self._update = None          # last update.Check (git / ZIP installation)
-        self._release = None         # installed .exe: the release found, then (path, sha256) once downloaded
-        self._setup_file = None
-        self._downloading = False
-        self._update_note = ("", 0.0)    # the check's result on the button itself, until then (where the click was)
+        self._init_update_state()
         self.overlay_hidden = False  # hotkey / tray: translations hidden until toggled again
         self.tray = None
         self.hotkey = None
@@ -114,10 +87,21 @@ class MainWindow(QWidget):
 
     # ---------------------------------------------------------------- UI
     def _build(self):
-        s = self.settings
+        """The window's contents, all made from the settings (built again on a language or theme change)."""
         root = QVBoxLayout(self)
+        self._build_head(root)
+        self.tabs = QTabWidget()
+        root.addWidget(self.tabs, 1)
+        self.tabs.addTab(self._translations_tab(), tr("Translations"))
+        self.service_tab = self._service_tab()
+        self.tabs.addTab(self.service_tab, tr("Service"))
+        self.tabs.addTab(self._options_tab(), tr("Options"))
+        self._build_bottom(root)
+        self._update_button()
+        self._service_ui()
 
-        # what the program is doing, and the one thing to do next
+    def _build_head(self, root):
+        """Status with its dot, the hint with "Show me", Start and "Mark chat area"."""
         head = QHBoxLayout()
         self.dot = QLabel()
         self.dot.setFixedSize(12, 12)
@@ -150,10 +134,8 @@ class MainWindow(QWidget):
         row.addWidget(self.pick_btn, 1)
         root.addLayout(row)
 
-        self.tabs = QTabWidget()
-        root.addWidget(self.tabs, 1)
-
-        # ---- tab 1: what was translated
+    def _translations_tab(self):
+        """Tab 1: what was translated."""
         page = QWidget()
         box = QVBoxLayout(page)
         self.history = QTextBrowser()
@@ -165,10 +147,12 @@ class MainWindow(QWidget):
         self.shot_btn = QPushButton(tr("Show last capture"), clicked=self.show_last_picture)
         under.addWidget(self.shot_btn)
         box.addLayout(under)
-        self.tabs.addTab(page, tr("Translations"))
+        return page
 
-        # ---- tab 2: the service and what it needs
-        self.service_tab = page = QWidget()
+    def _service_tab(self):
+        """Tab 2: the service and what it needs."""
+        s = self.settings
+        page = QWidget()
         box = QVBoxLayout(page)
         grid = QGridLayout()
         grid.addWidget(QLabel(tr("Translate to:")), 0, 0)
@@ -233,9 +217,11 @@ class MainWindow(QWidget):
         test_row.addStretch(1)
         box.addLayout(test_row)
         box.addStretch(1)
-        self.tabs.addTab(page, tr("Service"))
+        return page
 
-        # ---- tab 3: everything that is set once
+    def _options_tab(self):
+        """Tab 3: everything that is set once."""
+        s = self.settings
         page = QWidget()
         box = QVBoxLayout(page)
         group = QGroupBox(tr("Translation window"))
@@ -322,16 +308,16 @@ class MainWindow(QWidget):
         last.addStretch(1)
         box.addLayout(last)
         box.addStretch(1)
-        self.tabs.addTab(page, tr("Options"))
+        return page
 
+    def _build_bottom(self, root):
+        """Costs and the update button."""
         bottom = QHBoxLayout()
         self.costs = QLabel()
         bottom.addWidget(self.costs, 1)
         self.update_btn = QPushButton("", clicked=self.update_clicked)
         bottom.addWidget(self.update_btn)
         root.addLayout(bottom)
-        self._update_button()
-        self._service_ui()
 
     def _language_changed(self, _index=None):
         """Another language: build the window's contents again (they are all made from the settings)."""
@@ -623,7 +609,15 @@ class MainWindow(QWidget):
         self._refresh()
 
     def _load_local_models(self):
-        names = ollama.installed_models(int(self.settings["ollama_port"]))
+        """Ask the local Ollama for its models – in a thread (up to 5 s without a server; 0.12: the window froze)."""
+        port, put = int(self.settings["ollama_port"]), self.results.put
+        self.local_btn.setEnabled(False)
+        import threading
+        threading.Thread(target=lambda: put(("models", ollama.installed_models(port))), name="models",
+                         daemon=True).start()
+
+    def _local_models_loaded(self, names):
+        self.local_btn.setEnabled(True)
         if not names:
             self._say(tr(ERRORS["server"]) + " " + tr("Or no model pulled yet."))
             return
@@ -676,163 +670,11 @@ class MainWindow(QWidget):
         if at_end:
             bar.setValue(bar.maximum())
 
-    # ---------------------------------------------------------------- updates (only on click)
-    UPDATE_TEXT = {
-        "current": N_("Fog Translate is up to date."),
-        "dirty": N_("Cannot update: files in the program folder were changed."),
-        "branch": N_("Cannot update: not on the \"main\" branch."),
-        "ahead": N_("Cannot update: the program folder has its own commits."),
-        "error": N_("Update check failed (no connection to GitHub?)."),
-    }
-
-    def _update_button(self):
-        """The button says what the next click does."""
-        c, text, on = self._update, tr("Check for updates"), True
-        if self._downloading:
-            text, on = tr("Downloading …"), False
-        elif self._setup_file is not None:
-            text = tr("Install and restart")
-        elif self._release is not None:
-            text = tr("Download update")
-        elif c is not None and c.state == "behind":
-            text = tr("Update and restart")
-        elif c is not None and c.state == "newer":
-            text = tr("Open download page")
-        elif self._update_note[1] > time.monotonic():
-            text = self._update_note[0]
-        self.update_btn.setText(text)
-        self.update_btn.setEnabled(on)
-
-    def _self_updating(self) -> bool:
-        """The installed .exe on Windows updates itself from the releases (relupdate.py)."""
-        from . import update
-        return update.frozen() and sys.platform == "win32"
-
-    def update_clicked(self):
-        from . import update
-        if self._setup_file is not None:
-            self._release_install()
-            return
-        if self._release is not None:
-            self._release_download()
-            return
-        c = self._update
-        if c is not None and c.state == "behind":
-            self._update_apply()
-            return
-        if c is not None and c.state == "newer":
-            from PySide6.QtCore import QUrl
-            from PySide6.QtGui import QDesktopServices
-            QDesktopServices.openUrl(QUrl(update.download_page()))
-            return
-        self.update_btn.setEnabled(False)
-        self.update_btn.setText(tr("Checking …"))
-        import threading
-        if self._self_updating():
-            from . import relupdate
-            work = lambda: self.results.put(("release", relupdate.check(__version__)))      # noqa: E731
-        else:
-            work = lambda: self.results.put(("update", update.check()))                    # noqa: E731
-        threading.Thread(target=work, name="update", daemon=True).start()
-
-    def _update_checked(self, c):
-        self._update = c
-        if c.state == "behind":
-            self._say(tr("Update available (%d changes).") % c.behind)
-        elif c.state == "newer":
-            self._say(tr("Version %s is available (installed: %s).") % (c.remote_version, __version__))
-        else:
-            self._say(tr(self.UPDATE_TEXT.get(c.state, c.state)))
-            self._note_update(c.state)
-        self._update_button()
-        log.info("Update-Prüfung: %s", c.state)
-
-    def _note_update(self, state: str, seconds: float = 6.0):
-        """Nothing to install: say so on the button too – the status line is at the other end of the window, and
-        the button only flickering looked as if nothing had happened (Saru, 11.11.2026)."""
-        text = {"current": tr("Up to date"), "error": tr("Check failed")}.get(state)
-        if text:
-            self._update_note = (text, time.monotonic() + seconds)
-
     def _say(self, text: str, seconds: float = 15.0):
         """A message in the status line that stays readable for a moment (the line is rewritten 5× a second)."""
         self._test_text = text
         self._test_until = datetime.now().timestamp() + seconds
         self.status.setText(text)
-
-    # the installed .exe: check → download → install, each on its own click
-    def _release_checked(self, value):
-        state, rel, detail = value
-        self._release = rel
-        if state == "available":
-            self._say(tr("Version %s is available (installed: %s).") % (rel.version, __version__))
-        else:
-            state = "current" if state == "current" else "error"
-            self._say(tr(self.UPDATE_TEXT[state]))
-            self._note_update(state)
-        self._update_button()
-        log.info("Update-Prüfung: %s %s", state, detail)
-
-    def _release_download(self):
-        from . import relupdate
-        from .config import data_dir
-        rel, put, folder = self._release, self.results.put, data_dir()
-        self._downloading = True
-        self._update_button()
-        self._say(tr("Downloading version %s …") % rel.version, 600)
-
-        def work():
-            try:
-                put(("downloaded", (relupdate.download(rel, folder), rel.sha256)))
-            except (OSError, ValueError) as e:
-                log.warning("Update: Download fehlgeschlagen (%s: %s)", type(e).__name__, e)
-                put(("downloaded", None))
-
-        import threading
-        threading.Thread(target=work, name="update", daemon=True).start()
-
-    def _release_downloaded(self, value):
-        self._downloading = False
-        self._setup_file = value
-        if value is None:
-            self._say(tr("Download failed or the file did not match its checksum – nothing was installed."))
-        else:
-            self._say(tr("Version %s is downloaded and checked. Click “Install and restart”.")
-                      % self._release.version, 600)
-        self._update_button()
-
-    def _release_install(self):
-        """Start the checked setup and end the program; the setup waits for that and starts the new version."""
-        from . import relupdate
-        from .config import data_dir
-        path, sha = self._setup_file
-        if self.running:
-            self.toggle()
-        if not relupdate.start_setup(path, sha, data_dir()):
-            self._setup_file = None
-            self._say(tr("Update failed (see log)."))
-            self._update_button()
-            log.warning("Update: Setup nicht gestartet")
-            return
-        log.info("Update: Setup gestartet, Programm endet")
-        self.quit()
-
-    def _update_apply(self):
-        from . import update
-        if self.running:
-            self.toggle()
-        if not update.apply():
-            self._update = None
-            self._update_button()
-            self._say(tr("Update failed (see log)."))
-            log.warning("Update: Fast-Forward nicht möglich")
-            return
-        log.info("Update installiert, Neustart")
-        if update.restart():
-            self.close()
-            QApplication.quit()
-        else:
-            self._say(tr("Update installed – please restart Fog Translate."))
 
     # ---------------------------------------------------------------- region
     def pick_region(self):
@@ -990,6 +832,8 @@ class MainWindow(QWidget):
                 self._release_downloaded(value)
             elif kind == "test":
                 self._tested(value)
+            elif kind == "models":
+                self._local_models_loaded(value)
             elif kind == "tick":
                 self.game = value
             elif kind == "started":
@@ -1037,44 +881,17 @@ class MainWindow(QWidget):
 
     def _refresh(self):
         e = self.engine
-        text = tr(STATUS.get(e.status, e.status)) if self.running or e.status not in ("watching", "starting") \
-            else tr(STATUS["idle"])
-        if not self.running and self.next_step() == "region":
-            text = tr(STATUS["no_region"])
-        no_chat = False
-        if e.status == "error":
-            text = tr(ERRORS.get(e.error, e.error))
-        elif self.running and e.status == "watching":
-            from .change import MIN_TEXT_PX
-            if e.gate.stats.get("text_px", MIN_TEXT_PX) < MIN_TEXT_PX or not e.gate.stats.get("chat", True):
-                text, no_chat = tr(STATUS["no_chat"]), True
+        from .change import MIN_TEXT_PX
+        no_text = (e.gate.stats.get("text_px", MIN_TEXT_PX) < MIN_TEXT_PX or not e.gate.stats.get("chat", True))
+        v: View = view(e.status, e.error, self.running, "" if self.running else self.next_step(), no_text)
+        text = tr(ERRORS.get(e.error, e.error)) if v.error else tr(STATUS.get(v.status, v.status))
         now = datetime.now()
         if getattr(self, "_test_until", 0) > now.timestamp():
             text = self._test_text                       # the test's result stays readable for a moment
         self.status.setText(text)
         self.run_btn.setText(tr("Stop") if self.running else tr("Start"))
-        # the dot, the hint and its button: what is going on and the one thing to do next
-        step = "" if self.running else self.next_step()
-        look, hint, goal = "off", "", ""
-        if e.status == "error":
-            look = "bad"
-            if e.error == "key" and not step:
-                hint, goal = HINTS["bad_key"], "key"
-        elif self.running:
-            look = "wait"
-            if e.status == "cap":
-                hint, goal = HINTS["cap"], "cap"
-            elif e.status == "no_game":
-                hint = HINTS["no_game"]
-            elif e.status in ("watching", "asking") and not no_chat:
-                look, hint = "on", HINTS["running"]
-        elif e.status == "unconfirmed":
-            look = "bad"
-        if step:
-            hint, goal = HINTS[step], step if step != "region" else ""
-        elif not self.running and e.status != "error":
-            hint = HINTS["ready"]
-        hint = tr(hint) if hint else ""
+        step, look, goal = v.step, v.look, v.goal
+        hint = tr(HINTS[v.hint]) if v.hint else ""
         if look == "on" and self.settings["hide_hotkey"]:
             hint += " " + tr("%s hides and shows the translations.") % self.settings["hide_hotkey"]
         self.hint.setText(hint)
