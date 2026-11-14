@@ -400,7 +400,7 @@ class MainWindow(QWidget):
         service = s["service"]
         if not s.accepted(service):
             return "notice"
-        if services.is_cloud(service) and not s.api_key(service):
+        if services.is_cloud(service) and not s.has_key(service):
             return "key"
         if s["region"] is None:
             return "region"

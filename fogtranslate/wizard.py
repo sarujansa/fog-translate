@@ -259,7 +259,7 @@ class SetupWizard(QWidget):
                 self.key.clear()
                 self.key.setPlaceholderText(tr("saved"))
         s.save()
-        return not services.is_cloud(service) or bool(s.api_key(service))
+        return not services.is_cloud(service) or s.has_key(service)
 
     def next(self):
         index = self.pages.currentIndex()

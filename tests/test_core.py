@@ -286,6 +286,23 @@ def test_the_key_is_never_stored_in_clear_text(tmp_path):
     assert s.api_key("claude") == "sk-ant-secret"
 
 
+def test_key_presence_is_decrypted_once_not_on_every_look(tmp_path, monkeypatch):
+    calls = []
+    flip = lambda data, enc: (calls.append(enc), bytes(b ^ 0x5A for b in data))[1]
+    monkeypatch.setattr(secret, "CIPHER", flip)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    s = Settings(str(tmp_path))
+    assert not s.has_key("claude")
+    s.set_api_key("claude", "sk-ant-x")
+    calls.clear()
+    assert all(s.has_key("claude") for _ in range(50))
+    assert calls == [False]                         # one decryption for fifty questions
+    s.set_api_key("claude", "")
+    assert not s.has_key("claude")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env")
+    assert s.has_key("claude") and not s.has_key("ollama")
+
+
 def test_dpapi_round_trip_with_a_stand_in_cipher():
     flip = lambda data, enc: bytes(b ^ 0x5A for b in data)
     stored = secret.protect("abc", cipher=flip)

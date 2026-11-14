@@ -63,6 +63,7 @@ class Settings:
         self.path = os.path.join(self.folder, "settings.json")
         self.values = dict(DEFAULTS)
         self.session_keys: dict[str, str] = {}      # keys kept only for this run (no DPAPI)
+        self._key_there: dict[str, tuple] = {}      # service → (stored text, env set, answer) – see has_key
         self._load()
 
     def _load(self):
@@ -151,6 +152,24 @@ class Settings:
         return (self.session_keys.get(service) or secret.unprotect(self.values[setting])
                 or os.environ.get(self.ENV_KEYS[service], ""))
 
+    def has_key(self, service: str) -> bool:
+        """Whether ``api_key(service)`` would give a key – without decrypting it each time (0.12: the window asked
+        five times a second and every answer ran DPAPI and put the clear key in memory). Remembered per stored
+        text and environment variable, so a new key or a changed variable is seen at once."""
+        from . import secret
+        setting = services.KEY_SETTING.get(service)
+        if setting is None:
+            return False
+        if self.session_keys.get(service):
+            return True
+        stored, env = self.values[setting], bool(os.environ.get(self.ENV_KEYS[service]))
+        hit = self._key_there.get(service)
+        if hit is not None and hit[:2] == (stored, env):
+            return hit[2]
+        yes = env or bool(secret.unprotect(stored))
+        self._key_there[service] = (stored, env, yes)
+        return yes
+
     def has_stored_key(self, service: str) -> bool:
         setting = services.KEY_SETTING.get(service)
         return bool(setting and (self.values[setting] or self.session_keys.get(service)))
@@ -161,6 +180,7 @@ class Settings:
         setting = services.KEY_SETTING[service]
         key = key.strip()
         try:
+            self._key_there.pop(service, None)
             self.values[setting] = secret.protect(key)
             self.session_keys.pop(service, None)
             self.save()
