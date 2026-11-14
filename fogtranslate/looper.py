@@ -1,7 +1,6 @@
 """The look thread: everything that can take time runs here, never in the window's thread.
 
-Building the translator (the Claude SDK takes seconds to import on Windows, longer while a virus scanner checks
-the files on the first start), finding the DBD window, grabbing the region and comparing pictures. The window
+Building the translator, finding the DBD window, grabbing the region and comparing pictures. The window
 only gets messages through ``post`` (a queue it empties with a timer).
 """
 from __future__ import annotations

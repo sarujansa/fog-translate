@@ -143,19 +143,11 @@ def test_keys_are_kept_per_service(monkeypatch):
     assert s.api_key("gemini") == "from-env" and s.api_key("ollama") == ""
 
 
-def test_the_sdk_is_imported_under_one_lock():
-    """Two look threads importing anthropic at once broke pydantic's lazy imports (CI, 10.11.2026)."""
-    import threading
-    from fogtranslate import claude
-    seen = []
-
-    def load():
-        seen.append(claude.sdk().__name__)
-
-    threads = [threading.Thread(target=load) for _ in range(4)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join(30)
-    assert seen == ["anthropic"] * 4
-    assert isinstance(claude._IMPORT_LOCK, type(threading.Lock()))
+def test_claude_needs_no_sdk():
+    """0.12: one POST through http.py instead of the anthropic SDK (pydantic, httpx …, seconds to import)."""
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "fogtranslate", "claude.py"), encoding="utf-8") as fh:
+        assert "import anthropic" not in fh.read()
+    with open(os.path.join(root, "requirements.txt"), encoding="utf-8") as fh:
+        assert "anthropic==" not in fh.read()

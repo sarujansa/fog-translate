@@ -136,26 +136,28 @@ def test_schema_is_strict():
     assert set(item["required"]) == set(item["properties"])
 
 
-class FakeClient:
-    def __init__(self, answer=None, error=None, stop="end_turn"):
+class FakePost:
+    """Stands in for ``http.exchange``: records the request, answers like the Messages API."""
+    def __init__(self, answer=None, stop="end_turn", status=200, text=None, headers=None):
         self.calls = []
-        self.answer, self.error, self.stop = answer, error, stop
-        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
+        self.answer, self.stop, self.status, self.text, self.headers = answer, stop, status, text, headers or {}
+        self.answers = None                       # a list of (status, data, headers) to answer in turn
 
-    def _create(self, **kwargs):
-        self.calls.append(kwargs)
-        if self.error:
-            raise self.error
-        usage = SimpleNamespace(input_tokens=1000, output_tokens=100, cache_read_input_tokens=0,
-                                cache_creation_input_tokens=0)
-        return SimpleNamespace(stop_reason=self.stop, usage=usage,
-                               content=[SimpleNamespace(type="text", text=json.dumps(self.answer))])
+    def __call__(self, method, url, headers, body, timeout):
+        self.calls.append(dict(body, _url=url, _headers=headers))
+        if self.answers:
+            return self.answers.pop(0)
+        text = self.text if self.text is not None else json.dumps(self.answer)
+        data = {"stop_reason": self.stop, "content": [{"type": "text", "text": text}],
+                "usage": {"input_tokens": 1000, "output_tokens": 100, "cache_read_input_tokens": 0,
+                          "cache_creation_input_tokens": 0}}
+        return self.status, data, self.headers
 
 
 def test_the_request_sends_only_the_picture_and_the_target_language():
-    fake = FakeClient({"lines": [{"sender": "Meg", "text": "oi", "language": "pt", "translation": "hallo",
-                                  "translate": True}]})
-    res = Translator("k", "claude-opus-5-5", "de", client=fake).request(_chat(3))
+    fake = FakePost({"lines": [{"sender": "Meg", "text": "oi", "language": "pt", "translation": "hallo",
+                                "translate": True}]})
+    res = Translator("k", "claude-opus-5-5", "de", post=fake).request(_chat(3))
     assert [ln.translation for ln in res.lines] == ["hallo"]
     assert res.cost_usd == pytest.approx((1000 * 4 + 100 * 20) / 1e6)
     call = fake.calls[0]
@@ -164,20 +166,61 @@ def test_the_request_sends_only_the_picture_and_the_target_language():
     assert content[1]["text"] == "Target language: German."
     assert call["output_config"]["format"]["type"] == "json_schema"
     assert call["fallbacks"] == "default"
+    assert call["_url"] == "https://api.anthropic.com/v1/messages"
+    assert call["_headers"]["Authorization"] == "Bearer k"
+    assert call["_headers"]["anthropic-beta"] == "server-side-fallback-2026-07-01"
+    haiku = FakePost({"lines": []})
+    Translator("k", "claude-haiku-5-5", "de", post=haiku).request(_chat(3))
+    assert "fallbacks" not in haiku.calls[0] and "anthropic-beta" not in haiku.calls[0]["_headers"]
 
 
 def test_a_refusal_and_a_broken_answer_become_errors():
     with pytest.raises(TranslateError) as e:
-        Translator("k", client=FakeClient({"lines": []}, stop="refusal")).request(_chat(4))
+        Translator("k", post=FakePost({"lines": []}, stop="refusal")).request(_chat(4))
     assert e.value.kind == "refused"
-    fake = FakeClient()
-    fake.answer = None
-    fake._create = lambda **kw: SimpleNamespace(stop_reason="end_turn", usage=None,
-                                                content=[SimpleNamespace(type="text", text="{oops")])
-    fake.beta.messages.create = fake._create
     with pytest.raises(TranslateError) as e:
-        Translator("k", client=fake).request(_chat(4))
+        Translator("k", post=FakePost(text="{oops")).request(_chat(4))
     assert e.value.kind == "answer"
+
+
+@pytest.mark.parametrize("status,message,kind", [
+    (401, "invalid x-api-key", "key"), (403, "", "key"), (429, "", "quota"), (404, "", "model"),
+    (400, "Your credit balance is too low", "quota"), (400, "bad image", "other"), (529, "Overloaded", "other"),
+])
+def test_http_errors_become_the_same_kinds_as_with_the_sdk(status, message, kind):
+    fake = FakePost()
+    fake.answers = [(status, {"type": "error", "error": {"message": message}}, {"retry-after": "1"})] * 2
+    waits = []
+    with pytest.raises(TranslateError) as e:
+        Translator("k", post=fake, sleep=waits.append).request(_chat(4))
+    assert e.value.kind == kind
+    retried = status in (429, 529)
+    assert len(fake.calls) == (2 if retried else 1) and waits == ([1.0] if retried else [])
+
+
+def test_one_retry_like_the_sdk():
+    from fogtranslate import http
+    ok = (200, {"stop_reason": "end_turn", "content": [{"type": "text", "text": '{"lines": []}'}], "usage": {}}, {})
+    fake = FakePost()
+    fake.answers = [(500, {}, {}), ok]
+    waits = []
+    assert Translator("k", post=fake, sleep=waits.append).request(_chat(4)).lines == []
+    assert len(waits) == 1 and 0.37 <= waits[0] <= 0.5                     # the SDK's first back-off
+    fake.answers = [(429, {}, {"retry-after": "30"}), ok]                    # too long: the engine pauses instead
+    with pytest.raises(TranslateError) as e:
+        Translator("k", post=fake, sleep=waits.append).request(_chat(4))
+    assert e.value.kind == "quota"
+    fake.answers = [(500, {}, {"x-should-retry": "false"}), ok]
+    with pytest.raises(TranslateError):
+        Translator("k", post=fake, sleep=waits.append).request(_chat(4))
+    calls = []
+
+    def offline(*args):
+        calls.append(1)
+        raise http.NetError("URLError")
+    with pytest.raises(TranslateError) as e:
+        Translator("k", post=offline, sleep=lambda s: None).request(_chat(4))
+    assert e.value.kind == "net" and len(calls) == 2
 
 
 # ---------------------------------------------------------------- engine

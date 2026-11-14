@@ -42,8 +42,10 @@ def test_only_the_services_talk_to_the_network():
 
 
 def test_each_service_reaches_only_its_own_host():
+    import fogtranslate.claude as claude
     import fogtranslate.gemini as gemini
     import fogtranslate.ollama as ollama
+    assert claude.HOST == "https://api.anthropic.com" and claude.URL.startswith(claude.HOST + "/")
     assert gemini.HOST == "https://generativelanguage.googleapis.com"
     assert ollama.HOST == "127.0.0.1"
     assert ollama.base_url(99999) == "http://127.0.0.1:11434"
