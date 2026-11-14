@@ -787,3 +787,32 @@ def test_answers_without_any_message_slow_the_requests_down():
     eng.answer(Result([READ], 0.0))                    # a message was read: back to normal
     eng.answer(Result([], 0.0))
     assert eng._not_before - t[0] == EMPTY_WAIT_S
+
+
+def test_the_fast_box_minimum_matches_a_sliding_window_minimum():
+    from fogtranslate.change import _box_min
+    rng = np.random.default_rng(7)
+    for shape in ((40, 33), (7, 7), (3, 90), (120, 5)):
+        g = rng.uniform(0, 255, shape).astype(np.float32)
+        p = 3
+        padded = np.pad(g, p, mode="edge")
+        rows = np.lib.stride_tricks.sliding_window_view(padded, 7, axis=1).min(axis=-1)
+        want = np.lib.stride_tricks.sliding_window_view(rows, 7, axis=0).min(axis=-1)
+        assert np.array_equal(_box_min(g, 7), want)
+
+
+def test_long_runs_match_the_plain_definition():
+    from fogtranslate.change import _long_runs
+    rng = np.random.default_rng(3)
+    for shape in ((50, 70), (29, 31), (5, 40)):
+        m = rng.random(shape) < 0.93
+        for axis in (0, 1):
+            want = np.zeros_like(m)
+            if m.shape[axis] >= 30:
+                full = np.lib.stride_tricks.sliding_window_view(m, 30, axis=axis).all(axis=-1)
+                for k in range(30):
+                    if axis == 1:
+                        want[:, k:k + full.shape[1]] |= full
+                    else:
+                        want[k:k + full.shape[0], :] |= full
+            assert np.array_equal(_long_runs(m, 30, axis), want)
