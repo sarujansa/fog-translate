@@ -36,26 +36,7 @@ STATUS = {
     "error": N_("Error"),
     "unconfirmed": N_("Stopped: please confirm the notice below for this service, then press Start."),
 }
-ERRORS = {
-    "key": N_("API key missing or invalid."),
-    "quota": N_("Rate limit, quota or credit of the service reached."),
-    "net": N_("No connection to the service."),
-    "refused": N_("The service declined this request."),
-    "answer": N_("Could not read the service's answer."),
-    "model": N_("Model not found – check the name (Ollama: \"ollama pull <model>\")."),
-    "server": N_("Ollama is not running (or a different port is set)."),
-    "other": N_("Unexpected error (see log)."),
-}
-NOTICES = {
-    "claude": N_("The picture of the marked area (it can show player names and other players' messages) is sent to "
-               "Anthropic for translation – with your own API key, at your own cost."),
-    "gemini": N_("The picture of the marked area (it can show player names and other players' messages) is sent to "
-               "Google for translation. On the free tier Google may use the data to improve its products, and "
-               "humans may read it."),
-    "ollama": N_("Ollama runs on your PC – the picture never leaves it. Install Ollama (ollama.com) and pull a vision "
-               "model, e.g. \"ollama pull qwen2.5vl:7b\" (about 6 GB, needs a GPU with 8 GB or more) or "
-               "\"gemma3:4b\" for smaller cards."),
-}
+ERRORS, NOTICES = services.ERRORS, services.NOTICES
 
 
 # the line under the status: the one thing to do next
@@ -475,31 +456,16 @@ class MainWindow(QWidget):
         self.test_btn.setEnabled(False)
         self._say(tr("Testing %s …") % tr(services.SERVICES[service][0]), 120)
         settings, put = self.settings, self.results.put
-
-        def work():
-            import time
-            t0 = time.monotonic()
-            try:
-                result = services.make(settings).request(translate.sample_picture())
-                result.seconds = time.monotonic() - t0
-                put(("test", result))
-            except translate.TranslateError as e:
-                put(("test", e))
-            except Exception as e:
-                log.exception("Test failed")
-                put(("test", translate.TranslateError("other", type(e).__name__)))
-
         import threading
-        threading.Thread(target=work, name="test", daemon=True).start()
+        threading.Thread(target=lambda: put(("test", services.test_request(settings))), name="test",
+                         daemon=True).start()
 
     def _tested(self, outcome):
         self.test_btn.setEnabled(True)
+        services.count_test(self.settings, outcome)
         if isinstance(outcome, translate.TranslateError):
             self._test_text = tr("Test failed: %s") % tr(ERRORS.get(outcome.kind, outcome.kind))
         else:
-            now = datetime.now()
-            self.settings.count_request(now.strftime("%Y-%m-%d"), now.strftime("%Y-%m"), outcome.cost_usd)
-            self.settings.save()
             self._test_text = (tr("Test OK – %d of 3 messages read in %.1f s.")
                                % (min(3, len(outcome.lines)), outcome.seconds))
         log.info("Test: %s", self._test_text)

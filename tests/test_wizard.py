@@ -100,6 +100,8 @@ def test_the_test_button_reports_success_and_failure(app):
     wiz.test()
     _wait(wiz, lambda: "works" in wiz.result.text() or "failed" in wiz.result.text())
     assert "It works" in wiz.result.text() and "3 of 3" in wiz.result.text()
+    from datetime import datetime
+    assert Settings().requests_today(datetime.now().strftime("%Y-%m-%d")) == 1      # a test counts as a request
 
     def broken(settings):
         raise TranslateError("key")
@@ -107,7 +109,7 @@ def test_the_test_button_reports_success_and_failure(app):
     wiz._make = broken
     wiz.test()
     _wait(wiz, lambda: "failed" in wiz.result.text())
-    assert "not valid" in wiz.result.text()
+    assert "invalid" in wiz.result.text()
     wiz.close()
 
 

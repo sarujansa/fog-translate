@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import queue
 import threading
-import time
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton,
@@ -28,24 +27,6 @@ ABOUT = {
     "ollama": N_("Free, nothing leaves your PC. Needs Ollama installed, a vision model pulled and a "
               "graphics card with about 8 GB."),
 }
-NOTICE = {
-    "claude": N_("The picture of the marked chat area (it can show player names and other players' messages) is sent "
-              "to Anthropic – with your own API key, at your own cost."),
-    "gemini": N_("The picture of the marked chat area (it can show player names and other players' messages) is sent "
-              "to Google. On the free tier Google may use it to improve its products, and humans may read it."),
-}
-ERRORS = {
-    "key": N_("The API key is missing or not valid."),
-    "quota": N_("The service reports a limit or no credit."),
-    "net": N_("No connection to the service."),
-    "model": N_("Model not found."),
-    "server": N_("Ollama is not running."),
-    "refused": N_("The service declined the test."),
-    "answer": N_("The service's answer could not be read."),
-    "other": N_("Unexpected error (see log)."),
-}
-
-
 def wanted(settings) -> bool:
     """Show the assistant at start: never finished or skipped, and nothing is set up yet."""
     if settings["setup_done"]:
@@ -224,7 +205,7 @@ class SetupWizard(QWidget):
                 tr("Get a key here:"), url, url,
                 tr("It is stored encrypted on this PC (Windows DPAPI) and only ever sent to this service."),
                 "<br><b>%s</b>" % tr("A key is already saved – leave the field empty to keep it.") if stored else ""))
-            self.notice.setText(tr(NOTICE[service]))
+            self.notice.setText(tr(services.NOTICES[service]))
         else:
             self.key_help.setText(tr("Install Ollama from %s, then run %s in a command prompt. No key is needed.") % (
                 '<a href="https://ollama.com">ollama.com</a>',
@@ -307,19 +288,8 @@ class SetupWizard(QWidget):
         self.test_btn.setEnabled(False)
         self.result.setText(tr("Testing …"))
         settings, make, put = self.settings, self._make, self._results.put
-
-        def work():
-            t0 = time.monotonic()
-            try:
-                result = make(settings).request(translate.sample_picture())
-                put((len(result.lines), time.monotonic() - t0, result.cost_usd))
-            except translate.TranslateError as e:
-                put(e)
-            except Exception as e:
-                log.exception("Setup test failed")
-                put(translate.TranslateError("other", type(e).__name__))
-
-        threading.Thread(target=work, name="setup-test", daemon=True).start()
+        threading.Thread(target=lambda: put(services.test_request(settings, make)), name="setup-test",
+                         daemon=True).start()
         self._timer.start()
 
     def _pump(self):
@@ -328,9 +298,11 @@ class SetupWizard(QWidget):
         except queue.Empty:
             return
         self._timer.stop()
+        services.count_test(self.settings, outcome)
         if isinstance(outcome, translate.TranslateError):
-            self.result.setText("<b>%s</b>" % (tr("Test failed: %s") % tr(ERRORS.get(outcome.kind, outcome.kind))))
+            self.result.setText("<b>%s</b>" % (tr("Test failed: %s")
+                                               % tr(services.ERRORS.get(outcome.kind, outcome.kind))))
         else:
-            read, seconds, _cost = outcome
-            self.result.setText("<b>%s</b> %s" % (tr("It works."), tr("%d of 3 sample messages read in %.1f s.") % (min(3, read), seconds)))
+            self.result.setText("<b>%s</b> %s" % (tr("It works."), tr("%d of 3 sample messages read in %.1f s.")
+                                                  % (min(3, len(outcome.lines)), outcome.seconds)))
         self._buttons()
