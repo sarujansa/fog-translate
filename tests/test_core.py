@@ -15,12 +15,6 @@ from fogtranslate.translate import SCHEMA, Result, TranslateError, parse
 
 
 # ---------------------------------------------------------------- geometry
-def test_viewport_of_the_users_ultrawide_has_bars_of_440():
-    assert geometry.viewport(3440, 1440) == (440, 0, 2560, 1440)
-    assert geometry.viewport(2560, 1440) == (0, 0, 2560, 1440)
-    assert geometry.viewport(1920, 1200) == (0, 60, 1920, 1080)
-
-
 def test_region_survives_another_window_size():
     rel = geometry.to_relative((860, 1000, 860, 360), geometry.window_space(3440, 1440))
     assert geometry.valid_region(rel)
@@ -136,26 +130,28 @@ def test_schema_is_strict():
     assert set(item["required"]) == set(item["properties"])
 
 
-class FakeClient:
-    def __init__(self, answer=None, error=None, stop="end_turn"):
+class FakePost:
+    """Stands in for ``http.exchange``: records the request, answers like the Messages API."""
+    def __init__(self, answer=None, stop="end_turn", status=200, text=None, headers=None):
         self.calls = []
-        self.answer, self.error, self.stop = answer, error, stop
-        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
+        self.answer, self.stop, self.status, self.text, self.headers = answer, stop, status, text, headers or {}
+        self.answers = None                       # a list of (status, data, headers) to answer in turn
 
-    def _create(self, **kwargs):
-        self.calls.append(kwargs)
-        if self.error:
-            raise self.error
-        usage = SimpleNamespace(input_tokens=1000, output_tokens=100, cache_read_input_tokens=0,
-                                cache_creation_input_tokens=0)
-        return SimpleNamespace(stop_reason=self.stop, usage=usage,
-                               content=[SimpleNamespace(type="text", text=json.dumps(self.answer))])
+    def __call__(self, method, url, headers, body, timeout):
+        self.calls.append(dict(body, _url=url, _headers=headers))
+        if self.answers:
+            return self.answers.pop(0)
+        text = self.text if self.text is not None else json.dumps(self.answer)
+        data = {"stop_reason": self.stop, "content": [{"type": "text", "text": text}],
+                "usage": {"input_tokens": 1000, "output_tokens": 100, "cache_read_input_tokens": 0,
+                          "cache_creation_input_tokens": 0}}
+        return self.status, data, self.headers
 
 
 def test_the_request_sends_only_the_picture_and_the_target_language():
-    fake = FakeClient({"lines": [{"sender": "Meg", "text": "oi", "language": "pt", "translation": "hallo",
-                                  "translate": True}]})
-    res = Translator("k", "claude-opus-5-5", "de", client=fake).request(_chat(3))
+    fake = FakePost({"lines": [{"sender": "Meg", "text": "oi", "language": "pt", "translation": "hallo",
+                                "translate": True}]})
+    res = Translator("k", "claude-opus-5-5", "de", post=fake).request(_chat(3))
     assert [ln.translation for ln in res.lines] == ["hallo"]
     assert res.cost_usd == pytest.approx((1000 * 4 + 100 * 20) / 1e6)
     call = fake.calls[0]
@@ -164,20 +160,61 @@ def test_the_request_sends_only_the_picture_and_the_target_language():
     assert content[1]["text"] == "Target language: German."
     assert call["output_config"]["format"]["type"] == "json_schema"
     assert call["fallbacks"] == "default"
+    assert call["_url"] == "https://api.anthropic.com/v1/messages"
+    assert call["_headers"]["Authorization"] == "Bearer k"
+    assert call["_headers"]["anthropic-beta"] == "server-side-fallback-2026-07-01"
+    haiku = FakePost({"lines": []})
+    Translator("k", "claude-haiku-5-5", "de", post=haiku).request(_chat(3))
+    assert "fallbacks" not in haiku.calls[0] and "anthropic-beta" not in haiku.calls[0]["_headers"]
 
 
 def test_a_refusal_and_a_broken_answer_become_errors():
     with pytest.raises(TranslateError) as e:
-        Translator("k", client=FakeClient({"lines": []}, stop="refusal")).request(_chat(4))
+        Translator("k", post=FakePost({"lines": []}, stop="refusal")).request(_chat(4))
     assert e.value.kind == "refused"
-    fake = FakeClient()
-    fake.answer = None
-    fake._create = lambda **kw: SimpleNamespace(stop_reason="end_turn", usage=None,
-                                                content=[SimpleNamespace(type="text", text="{oops")])
-    fake.beta.messages.create = fake._create
     with pytest.raises(TranslateError) as e:
-        Translator("k", client=fake).request(_chat(4))
+        Translator("k", post=FakePost(text="{oops")).request(_chat(4))
     assert e.value.kind == "answer"
+
+
+@pytest.mark.parametrize("status,message,kind", [
+    (401, "invalid x-api-key", "key"), (403, "", "key"), (429, "", "quota"), (404, "", "model"),
+    (400, "Your credit balance is too low", "quota"), (400, "bad image", "other"), (529, "Overloaded", "other"),
+])
+def test_http_errors_become_the_same_kinds_as_with_the_sdk(status, message, kind):
+    fake = FakePost()
+    fake.answers = [(status, {"type": "error", "error": {"message": message}}, {"retry-after": "1"})] * 2
+    waits = []
+    with pytest.raises(TranslateError) as e:
+        Translator("k", post=fake, sleep=waits.append).request(_chat(4))
+    assert e.value.kind == kind
+    retried = status in (429, 529)
+    assert len(fake.calls) == (2 if retried else 1) and waits == ([1.0] if retried else [])
+
+
+def test_one_retry_like_the_sdk():
+    from fogtranslate import http
+    ok = (200, {"stop_reason": "end_turn", "content": [{"type": "text", "text": '{"lines": []}'}], "usage": {}}, {})
+    fake = FakePost()
+    fake.answers = [(500, {}, {}), ok]
+    waits = []
+    assert Translator("k", post=fake, sleep=waits.append).request(_chat(4)).lines == []
+    assert len(waits) == 1 and 0.37 <= waits[0] <= 0.5                     # the SDK's first back-off
+    fake.answers = [(429, {}, {"retry-after": "30"}), ok]                    # too long: the engine pauses instead
+    with pytest.raises(TranslateError) as e:
+        Translator("k", post=fake, sleep=waits.append).request(_chat(4))
+    assert e.value.kind == "quota"
+    fake.answers = [(500, {}, {"x-should-retry": "false"}), ok]
+    with pytest.raises(TranslateError):
+        Translator("k", post=fake, sleep=waits.append).request(_chat(4))
+    calls = []
+
+    def offline(*args):
+        calls.append(1)
+        raise http.NetError("URLError")
+    with pytest.raises(TranslateError) as e:
+        Translator("k", post=offline, sleep=lambda s: None).request(_chat(4))
+    assert e.value.kind == "net" and len(calls) == 2
 
 
 # ---------------------------------------------------------------- engine
@@ -284,6 +321,23 @@ def test_the_key_is_never_stored_in_clear_text(tmp_path):
     s.save()
     assert "sk-ant-secret" not in (tmp_path / "settings.json").read_text(encoding="utf-8")
     assert s.api_key("claude") == "sk-ant-secret"
+
+
+def test_key_presence_is_decrypted_once_not_on_every_look(tmp_path, monkeypatch):
+    calls = []
+    flip = lambda data, enc: (calls.append(enc), bytes(b ^ 0x5A for b in data))[1]
+    monkeypatch.setattr(secret, "CIPHER", flip)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    s = Settings(str(tmp_path))
+    assert not s.has_key("claude")
+    s.set_api_key("claude", "sk-ant-x")
+    calls.clear()
+    assert all(s.has_key("claude") for _ in range(50))
+    assert calls == [False]                         # one decryption for fifty questions
+    s.set_api_key("claude", "")
+    assert not s.has_key("claude")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env")
+    assert s.has_key("claude") and not s.has_key("ollama")
 
 
 def test_dpapi_round_trip_with_a_stand_in_cipher():
@@ -787,3 +841,85 @@ def test_answers_without_any_message_slow_the_requests_down():
     eng.answer(Result([READ], 0.0))                    # a message was read: back to normal
     eng.answer(Result([], 0.0))
     assert eng._not_before - t[0] == EMPTY_WAIT_S
+
+
+def test_the_fast_box_minimum_matches_a_sliding_window_minimum():
+    from fogtranslate.change import _box_min
+    rng = np.random.default_rng(7)
+    for shape in ((40, 33), (7, 7), (3, 90), (120, 5)):
+        g = rng.uniform(0, 255, shape).astype(np.float32)
+        p = 3
+        padded = np.pad(g, p, mode="edge")
+        rows = np.lib.stride_tricks.sliding_window_view(padded, 7, axis=1).min(axis=-1)
+        want = np.lib.stride_tricks.sliding_window_view(rows, 7, axis=0).min(axis=-1)
+        assert np.array_equal(_box_min(g, 7), want)
+
+
+def test_long_runs_match_the_plain_definition():
+    from fogtranslate.change import _long_runs
+    rng = np.random.default_rng(3)
+    for shape in ((50, 70), (29, 31), (5, 40)):
+        m = rng.random(shape) < 0.93
+        for axis in (0, 1):
+            want = np.zeros_like(m)
+            if m.shape[axis] >= 30:
+                full = np.lib.stride_tricks.sliding_window_view(m, 30, axis=axis).all(axis=-1)
+                for k in range(30):
+                    if axis == 1:
+                        want[:, k:k + full.shape[1]] |= full
+                    else:
+                        want[k:k + full.shape[0], :] |= full
+            assert np.array_equal(_long_runs(m, 30, axis), want)
+
+
+# ---------------------------------------------------------------- http.py against a real local server
+def _serve(handler_body):
+    import http.server
+    import threading
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            handler_body(self)
+
+        def log_message(self, *args):
+            pass
+    server = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, "http://127.0.0.1:%d/x" % server.server_address[1]
+
+
+def test_http_returns_errors_caps_answers_and_refuses_redirects(monkeypatch):
+    from fogtranslate import http as fhttp
+
+    def answer(code, body=b"", headers=()):
+        def handle(h):
+            h.rfile.read(int(h.headers.get("Content-Length", 0)))
+            h.send_response(code)
+            for k, v in headers:
+                h.send_header(k, v)
+            h.send_header("Content-Length", str(len(body)))
+            h.end_headers()
+            h.wfile.write(body)
+        return handle
+
+    server, url = _serve(answer(429, b'{"error": {"message": "slow down"}}', [("Retry-After", "3")]))
+    try:
+        status, data, headers = fhttp.exchange("POST", url, body={"a": 1}, timeout=5)
+        assert status == 429 and data["error"]["message"] == "slow down" and headers["retry-after"] == "3"
+    finally:
+        server.shutdown()
+    monkeypatch.setattr(fhttp, "MAX_BYTES", 100)
+    server, url = _serve(answer(200, b'{"x": "' + b"a" * 200 + b'"}'))
+    try:
+        with pytest.raises(fhttp.NetError):
+            fhttp.request("POST", url, body={}, timeout=5)
+    finally:
+        server.shutdown()
+    server, url = _serve(answer(302, b"", [("Location", "http://127.0.0.1:9/elsewhere")]))
+    try:
+        status, data = fhttp.request("POST", url, body={}, timeout=5)
+        assert status == 302 and data == {}                    # not followed: a redirect could carry the key
+    finally:
+        server.shutdown()
+    with pytest.raises(fhttp.NetError):
+        fhttp.request("POST", "http://127.0.0.1:9/nothing", body={}, timeout=2)   # nobody listens

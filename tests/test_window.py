@@ -370,3 +370,74 @@ def test_switching_to_an_unconfirmed_service_while_running_stops(app, monkeypatc
     win.accept.setChecked(False)                      # unticked while running: stops as well
     assert not win.running and win.looper is None
     win.close()
+
+
+def test_the_overlay_is_not_laid_out_or_painted_again_when_nothing_changed(app, monkeypatch):
+    from fogtranslate.overlay import TranslationOverlay
+    ov = TranslationOverlay(18)
+    measured, painted = [], []
+    real = ov.layout_size
+    monkeypatch.setattr(ov, "layout_size", lambda lines: (measured.append(1), real(lines))[1])
+    monkeypatch.setattr(ov, "update", lambda: painted.append(1))
+    line = ChatLine("Ana", "привет", "ru", "hello", True)
+    for _ in range(5):
+        ov.show_lines([line], lambda size: (100, 100))
+    assert (len(measured), len(painted)) == (1, 1) and ov.rect_on_screen[:2] == (100, 100)
+    ov.show_lines([line], lambda size: (120, 100))                # moved: placed again, not measured
+    assert (len(measured), len(painted)) == (1, 2) and ov.rect_on_screen[:2] == (120, 100)
+    ov.show_lines([line, ChatLine("Bo", "hola", "es", "hi", True)], lambda size: (120, 100))
+    assert (len(measured), len(painted)) == (2, 3)
+    ov.set_font_px(24)
+    ov.show_lines([line], lambda size: (120, 100))
+    assert (len(measured), len(painted)) == (3, 4)
+    ov.hide()
+    ov.show_lines([line], lambda size: (120, 100))                # shown again after hiding
+    assert ov.isVisible() and len(painted) == 5
+    ov.close()
+
+
+def test_the_status_view_is_decided_without_widgets():
+    from fogtranslate.statusview import HINTS, STATUS, view
+    v = view("idle", "", False, "region", False)
+    assert (v.status, v.look, v.hint, v.goal) == ("no_region", "off", "region", "")     # no "Show me" for marking
+    v = view("idle", "", False, "key", False)
+    assert (v.hint, v.goal, v.step) == ("key", "key", "key")
+    assert view("watching", "", False, "", False).status == "idle"                     # stopped: never "watching"
+    assert view("idle", "", False, "", False).hint == "ready"
+    v = view("watching", "", True, "", True)
+    assert (v.status, v.look, v.hint) == ("no_chat", "wait", "")                        # running, but no chat text
+    v = view("watching", "", True, "", False)
+    assert (v.status, v.look, v.hint) == ("watching", "on", "running")
+    v = view("error", "key", True, "", False)
+    assert v.error and (v.look, v.hint, v.goal) == ("bad", "bad_key", "key")
+    assert view("cap", "", True, "", False).goal == "cap"
+    assert view("unconfirmed", "", False, "", False).look == "bad"
+    for state in ("idle", "no_region", "watching", "no_chat", "cap"):
+        assert state in STATUS
+    assert all(view(s, "", r, st, nt).hint in HINTS or view(s, "", r, st, nt).hint == ""
+               for s in STATUS for r in (True, False) for st in ("", "notice", "key", "region") for nt in (True, False))
+
+
+def test_local_models_are_asked_for_in_a_thread(app, monkeypatch):
+    import threading
+    import time
+    from fogtranslate import ollama
+    win = MainWindow(Settings())
+    _pick(win, "ollama")
+    asked = []
+    gate = threading.Event()
+
+    def slow(port):
+        asked.append(threading.current_thread().name)
+        gate.wait(5)
+        return ["gemma3:4b", "llava:34b"]
+    monkeypatch.setattr(ollama, "installed_models", slow)
+    win._load_local_models()                          # returns at once although the server has not answered
+    assert not win.local_btn.isEnabled()
+    gate.set()
+    deadline = time.monotonic() + 5
+    while win.model.findData("llava:34b") < 0 and time.monotonic() < deadline:
+        win._pump()
+        time.sleep(0.01)
+    assert asked == ["models"] and win.model.findData("llava:34b") >= 0 and win.local_btn.isEnabled()
+    win.close()

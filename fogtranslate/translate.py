@@ -34,9 +34,10 @@ SYSTEM = (
     "that begins with 'Name:' starts a new message. A line WITHOUT 'Name:' at its start continues the message "
     "above it (long messages wrap) - join it to that message. Lines like '----- Joined Match -----' are system "
     "messages without a sender. The picture can be several snapshots of the same chat stacked top to bottom "
-    "(older first, separated by a dark band): the same message can then appear more than once - return it once. "
+    "(older first, separated by a dark band; many snapshots fill several columns - the left column first): the "
+    "same message can then appear more than once - return it once. "
     "Skip a message whose first line is cut off at the top edge of a snapshot. Add "
-    "'…' only where a word is visibly cut by the right edge of the picture. Return every message top to bottom, "
+    "'…' only where a word is visibly cut by the right edge of a snapshot. Return every message top to bottom, "
     "exactly as written (any script or language): the sender (empty for system messages), the whole message text, "
     "its language as an ISO 639-1 code ('und' if unclear) and a natural translation of the whole message into the "
     "target language that keeps gamer slang and its tone (e.g. 'gg', 'ez', 'xdd', 'tbag', 'camping', "
@@ -88,8 +89,8 @@ class Result:
 
 
 def png_bytes(img) -> bytes:
-    # compress_level 1: ~10× faster than optimize=True for a few more KB (measured 125 ms → see tests)
-    """BGR numpy picture → PNG bytes, longest side ≤ MAX_SIDE (Pillow, in memory)."""
+    """BGR numpy picture → PNG bytes, longest side ≤ MAX_SIDE (Pillow, in memory). ``compress_level=1``: a
+    700×600 chat in 7 ms instead of 36 ms with ``optimize=True``, for 38 instead of 33 KB (measured 14.11.2026)."""
     from PIL import Image
     import numpy as np
     a = np.asarray(img)

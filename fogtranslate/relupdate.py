@@ -24,6 +24,8 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
+from .update import version_tuple
+
 REPO = "senisinx/fog-translate"
 API = "https://api.github.com/repos/%s/releases/latest" % REPO
 DOWNLOAD_PREFIX = "https://github.com/%s/releases/download/" % REPO
@@ -51,10 +53,6 @@ class Release:
     sha_url: str
     digest: str = ""                 # GitHub's own SHA-256 of the asset, when listed
     sha256: str = ""                 # the checked SHA-256 after download()
-
-
-def version_tuple(v: str) -> tuple:
-    return tuple(int(x) for x in re.findall(r"\d+", v)[:4])
 
 
 def parse_release(data) -> Release:

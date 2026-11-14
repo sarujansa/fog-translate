@@ -65,6 +65,10 @@ Bei Ollama spricht das Programm nur mit `127.0.0.1` (Port einstellbar, Standard 
 eingestellten Proxy vorbei – das Bild verlässt den PC nicht. „Load local models“
 füllt die Liste mit den installierten Modellen.
 
+Seit 0.12 spricht das Programm Claude direkt an (ohne das Anthropic-SDK): 16 Pakete weniger, schnellerer Start.
+Schreiben alle gleichzeitig, gehen mehrere Chat-Bilder in einer Anfrage in Spalten nebeneinander statt in einer
+langen Reihe – so bleibt die Schrift lesbar groß. „Test service“ zählt auch im Assistenten als Anfrage.
+
 ## Installieren
 
 **Einfach:** Unter [Releases](https://github.com/senisinx/fog-translate/releases/latest) die Datei

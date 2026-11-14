@@ -7,19 +7,7 @@ result screen use the full width on ultrawide – the chat sits right of the 16:
 """
 from __future__ import annotations
 
-ASPECT = 16 / 9
-MIN_SIZE = 0.02          # a region narrower/lower than 2 % of the viewport is a mis-click
-
-
-def viewport(width: int, height: int) -> tuple[int, int, int, int]:
-    """(x, y, w, h) of the 16:9 picture inside a window of ``width``×``height`` (client coordinates)."""
-    if width <= 0 or height <= 0:
-        return 0, 0, 0, 0
-    if width / height > ASPECT:                       # wider: bars left and right
-        w = round(height * ASPECT)
-        return (width - w) // 2, 0, w, height
-    h = round(width / ASPECT)                         # taller: bars top and bottom
-    return 0, (height - h) // 2, width, h
+MIN_SIZE = 0.02          # a region narrower/lower than 2 % of the game window is a mis-click
 
 
 def window_space(width: int, height: int) -> tuple[int, int, int, int]:

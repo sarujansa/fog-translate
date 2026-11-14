@@ -1,4 +1,4 @@
-"""The one small HTTP helper for the services without an SDK (Gemini, Ollama) – standard library only.
+"""The one small HTTP helper for all services (Claude, Gemini, Ollama) – standard library only.
 
 Redirects are refused (the services never need one, and a redirect could carry the key elsewhere); answers are
 capped at ``MAX_BYTES``. Requests to this PC (Ollama) never go through a proxy: the picture must not leave the PC.
@@ -35,14 +35,21 @@ class NetError(Exception):
 def request(method: str, url: str, headers: dict | None = None, body=None, timeout: float = 60.0,
             opener=None) -> tuple[int, dict]:
     """(status, parsed JSON or {}) – HTTP errors are returned, not raised; no connection raises NetError."""
+    status, parsed, _headers = exchange(method, url, headers, body, timeout, opener)
+    return status, parsed
+
+
+def exchange(method: str, url: str, headers: dict | None = None, body=None, timeout: float = 60.0,
+             opener=None) -> tuple[int, dict, dict]:
+    """Like ``request``, plus the answer's headers (lower-case names) – Claude reads ``retry-after`` from them."""
     data = None if body is None else json.dumps(body).encode("utf-8")
     req = urllib.request.Request(url, data=data, method=method,
                                  headers={"Content-Type": "application/json", **(headers or {})})
     try:
         with (opener or _opener(url)).open(req, timeout=timeout) as r:
-            status, raw = r.status, r.read(MAX_BYTES + 1)
+            status, raw, got = r.status, r.read(MAX_BYTES + 1), r.headers
     except urllib.error.HTTPError as e:
-        status, raw = e.code, (e.read(MAX_BYTES + 1) if e.fp else b"")
+        status, raw, got = e.code, (e.read(MAX_BYTES + 1) if e.fp else b""), e.headers
     except (urllib.error.URLError, OSError) as e:
         raise NetError(type(e).__name__) from None
     if len(raw) > MAX_BYTES:
@@ -51,4 +58,5 @@ def request(method: str, url: str, headers: dict | None = None, body=None, timeo
         parsed = json.loads(raw.decode("utf-8")) if raw else {}
     except ValueError:
         parsed = {}
-    return status, parsed if isinstance(parsed, dict) else {}
+    names = {k.lower(): v for k, v in (got.items() if got is not None else [])}
+    return status, parsed if isinstance(parsed, dict) else {}, names

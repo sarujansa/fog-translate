@@ -56,6 +56,10 @@ With Ollama the program only talks to `127.0.0.1` (port configurable, default 11
 the picture never leaves your PC. "Load local models" fills
 the list with your installed models.
 
+Since 0.12 the program talks to Claude directly (without the Anthropic SDK): 16 fewer packages, a faster start.
+When everybody types at once, several chat pictures go into one request side by side in columns instead of one
+long strip – so the text stays large enough to read. "Test service" also counts as a request in the assistant.
+
 ## Installing
 
 **Easy:** download `FogTranslate-Setup-<version>.exe` from
