@@ -201,16 +201,12 @@ class Engine:
         self.gate.mark_sent(mask)
 
     def _stacked(self):
-        """Backlog (oldest first) and the pending picture as one picture, top to bottom."""
+        """Backlog (oldest first) and the pending picture as one picture: top to bottom, and in columns (left
+        first) when that keeps the text larger – the service scales the picture to ``MAX_SIDE``, and five
+        600-pixel pictures in one column sent the text at half size exactly when the chat was fastest (0.12)."""
         if not self._backlog:
             return self._pending
-        import numpy as np
-        parts = []
-        for part in self._backlog + [self._pending]:
-            if parts:
-                parts.append(np.zeros((SEAM, part.shape[1], 3), part.dtype))
-            parts.append(part)
-        return np.vstack(parts)
+        return stack_parts(self._backlog + [self._pending])
 
     def _try_send(self):
         if self._pending is None:
@@ -293,3 +289,31 @@ class Engine:
         if not self.shown:
             return []
         return [ln for ln in self.transcript.entries if self.wanted(ln)][-KEEP_SHOWN:]
+
+
+
+def stack_parts(parts, max_side: int | None = None):
+    """Pictures of the same width as one picture: in order top to bottom (``SEAM`` dark rows between them),
+    spread over as many columns (``SEAM`` dark columns between them) as gives the largest scale under
+    ``max_side`` – no part is dropped or cut."""
+    import numpy as np
+    from .translate import MAX_SIDE
+    max_side = max_side or MAX_SIDE
+    w = parts[0].shape[1]
+    best = None
+    for cols in range(1, len(parts) + 1):
+        per = -(-len(parts) // cols)                          # parts per column, columns filled in order
+        columns = [parts[i:i + per] for i in range(0, len(parts), per)]
+        height = max(sum(p.shape[0] for p in c) + SEAM * (len(c) - 1) for c in columns)
+        width = len(columns) * w + SEAM * (len(columns) - 1)
+        scale = min(1.0, max_side / max(height, width))
+        if best is None or scale > best[0] + 1e-9:
+            best = (scale, columns, height)
+    _scale, columns, height = best
+    out = np.zeros((height, len(columns) * w + SEAM * (len(columns) - 1), 3), parts[0].dtype)
+    for n, column in enumerate(columns):
+        x, y = n * (w + SEAM), 0
+        for part in column:
+            out[y:y + part.shape[0], x:x + w] = part
+            y += part.shape[0] + SEAM
+    return out

@@ -84,3 +84,22 @@ def test_no_message_is_lost(rate, n, latency, service):
 def test_a_calm_chat_still_sends_single_small_pictures():
     missed, stats = simulate(0.2, 10, 1.5)
     assert missed == [] and stats["max_parts"] == 1 and stats["requests"] == 10
+
+
+def test_many_tall_pictures_go_into_columns_so_the_text_is_not_halved():
+    import numpy as np
+    from fogtranslate.engine import SEAM, stack_parts
+    from fogtranslate.translate import MAX_SIDE
+    rng = np.random.default_rng(5)
+    parts = [rng.integers(0, 255, (600, 700, 3), dtype=np.uint8) for _ in range(5)]
+    pic = stack_parts(parts)
+    one_column = 5 * 600 + 4 * SEAM
+    assert MAX_SIDE / one_column < 0.53                             # what a single column was scaled to
+    assert min(1.0, MAX_SIDE / max(pic.shape[:2])) > 0.8           # text now keeps more than 80 % of its size
+    # every part is in the picture whole, in order: down the first column, then the next
+    spots = [(y, x) for x in range(0, pic.shape[1], 700 + SEAM) for y in range(0, pic.shape[0], 600 + SEAM)]
+    found = [s for s in spots if any(np.array_equal(pic[s[0]:s[0] + 600, s[1]:s[1] + 700], p) for p in parts)]
+    order = [next(i for i, p in enumerate(parts) if np.array_equal(pic[y:y + 600, x:x + 700], p)) for y, x in found]
+    assert order == [0, 1, 2, 3, 4]
+    small = [rng.integers(0, 255, (100, 400, 3), dtype=np.uint8) for _ in range(3)]
+    assert stack_parts(small).shape == (3 * 100 + 2 * SEAM, 400, 3)     # fits: one column as before
