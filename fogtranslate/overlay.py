@@ -52,12 +52,15 @@ class TranslationOverlay(QWidget):
         self.hide_in_captures = False
         self._affinity = None
         self.rect_on_screen = None           # (x, y, w, h) while shown – read by the look thread
+        self._shown = None                   # what is on screen: (content, geometry) – see show_lines
+        self._size = None                    # (content, size): the last measurement
 
     def set_font_px(self, px: int):
         self.font_main = QFont("Segoe UI" if sys.platform == "win32" else "Sans")
         self.font_main.setPixelSize(max(10, int(px)))
         self.font_small = QFont(self.font_main)
         self.font_small.setPixelSize(max(9, int(px * 0.75)))
+        self._shown = self._size = None
 
     def rows(self, line: ChatLine):
         """[(parts, font)] – parts = [(text, colour)]: header (tag + name), translation, original (small)."""
@@ -85,18 +88,31 @@ class TranslationOverlay(QWidget):
             h += MSG_GAP if n < len(lines) - 1 else 0
         return w + 2 * PAD, h + PAD - ROW_GAP
 
+    def _content(self):
+        return (tuple((x.sender, x.text, x.language, x.translation, x.translate) for x in self.lines),
+                self.font_main.pixelSize(), self.show_original)
+
     def show_lines(self, lines, spot_for_size):
-        """``spot_for_size((w, h)) → (x, y)`` in physical screen pixels; hidden when there is nothing to show."""
+        """``spot_for_size((w, h)) → (x, y)`` in physical screen pixels; hidden when there is nothing to show.
+        The window asks five times a second; unchanged lines in the same place are neither measured nor painted
+        again (0.12 – a translucent window over the game)."""
         self.lines = list(lines)
         if not self.lines:
             self.rect_on_screen = None
+            self._shown = None
             self.hide()
             return
         r = qtgeom.ratio()
-        w, h = self.layout_size(self.lines)                     # Qt pixels
+        content = self._content() + (r,)
+        if self._size is None or self._size[0] != content:
+            self._size = (content, self.layout_size(self.lines))
+        w, h = self._size[1]                                    # Qt pixels
         pw, ph = qtgeom.from_qt((w, h), r)
         x, y = spot_for_size((pw, ph))
         qx, qy = qtgeom.to_qt((x, y), r)
+        state = (content, (qx, qy, w, h), self.hide_in_captures)
+        if self._shown == state and self.isVisible():
+            return
         self.setGeometry(qx, qy, w, h)
         self.rect_on_screen = (x, y, pw, ph)                    # physical, for blacking it out
         if not self.isVisible():
@@ -104,10 +120,12 @@ class TranslationOverlay(QWidget):
         if self._affinity is not self.hide_in_captures:
             exclude_from_capture(self, self.hide_in_captures)
             self._affinity = self.hide_in_captures
+        self._shown = state
         self.update()
 
     def hideEvent(self, event):
         self.rect_on_screen = None
+        self._shown = None
         super().hideEvent(event)
 
     def paintEvent(self, _event):

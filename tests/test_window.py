@@ -370,3 +370,27 @@ def test_switching_to_an_unconfirmed_service_while_running_stops(app, monkeypatc
     win.accept.setChecked(False)                      # unticked while running: stops as well
     assert not win.running and win.looper is None
     win.close()
+
+
+def test_the_overlay_is_not_laid_out_or_painted_again_when_nothing_changed(app, monkeypatch):
+    from fogtranslate.overlay import TranslationOverlay
+    ov = TranslationOverlay(18)
+    measured, painted = [], []
+    real = ov.layout_size
+    monkeypatch.setattr(ov, "layout_size", lambda lines: (measured.append(1), real(lines))[1])
+    monkeypatch.setattr(ov, "update", lambda: painted.append(1))
+    line = ChatLine("Ana", "привет", "ru", "hello", True)
+    for _ in range(5):
+        ov.show_lines([line], lambda size: (100, 100))
+    assert (len(measured), len(painted)) == (1, 1) and ov.rect_on_screen[:2] == (100, 100)
+    ov.show_lines([line], lambda size: (120, 100))                # moved: placed again, not measured
+    assert (len(measured), len(painted)) == (1, 2) and ov.rect_on_screen[:2] == (120, 100)
+    ov.show_lines([line, ChatLine("Bo", "hola", "es", "hi", True)], lambda size: (120, 100))
+    assert (len(measured), len(painted)) == (2, 3)
+    ov.set_font_px(24)
+    ov.show_lines([line], lambda size: (120, 100))
+    assert (len(measured), len(painted)) == (3, 4)
+    ov.hide()
+    ov.show_lines([line], lambda size: (120, 100))                # shown again after hiding
+    assert ov.isVisible() and len(painted) == 5
+    ov.close()
